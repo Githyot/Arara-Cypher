@@ -14,11 +14,13 @@ QtObject {
     // ---- Preferências (salvas entre execuções) ----
     property string style: "gnome"      // "gnome" | "apple"
     property string scheme: "system"    // "system" | "light" | "dark"
+    property real chordZoom: 1          // tamanho dos acordes na tela da música
 
     property Settings _settings: Settings {
         category: "appearance"
         property alias style: theme.style
         property alias scheme: theme.scheme
+        property alias chordZoom: theme.chordZoom
     }
 
     // ---- Estado derivado ----

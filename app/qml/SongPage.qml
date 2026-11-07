@@ -11,6 +11,20 @@ Rectangle {
     property string viewMode: "tab"   // "names" | "diagram" | "big" | "tab" | "score"
     property bool fullScore: false     // partitura da música inteira, em linhas
     readonly property bool showFullScore: viewMode === "score" && fullScore
+    readonly property real zoom: Theme.chordZoom
+
+    // Batidas usadas em alguma parte da música, na ordem.
+    readonly property var usedStrums: {
+        var out = []
+        if (!song || !song.strums) return out
+        for (var i = 0; i < song.strums.length; ++i) {
+            var used = false
+            for (var j = 0; j < song.sections.length; ++j)
+                if ((song.sections[j].strum || 0) === i) used = true
+            if (used) out.push(song.strums[i])
+        }
+        return out
+    }
 
     // Todos os compassos da música em sequência: um por acorde de cada parte.
     readonly property var allMeasures: {
@@ -20,8 +34,11 @@ Rectangle {
         for (var i = 0; i < song.sections.length; ++i) {
             var sec = song.sections[i]
             for (var j = 0; j < sec.chords.length; ++j) {
+                var strum = Examples.strumOf(song, sec)
                 out.push({
-                    chord: sec.chords[j],
+                    chord: Examples.chordName(sec.chords[j]),
+                    voicing: Examples.voicing(song, sec.chords[j]),
+                    pattern: strum ? strum.pattern : ["D"],
                     number: n++,
                     label: j === 0 ? sec.name : "",
                     repeat: j === sec.chords.length - 1 && sec.repeat > 1 ? sec.repeat : 0
@@ -140,11 +157,29 @@ Rectangle {
                         SegmentedControl {
                             model: [{ value: "names", label: "Nomes" },
                                     { value: "diagram", label: "Braço" },
-                                    { value: "big", label: "Grande" },
+                                    { value: "big", label: "Detalhado" },
                                     { value: "tab", label: "Tab" },
                                     { value: "score", label: "Partitura" }]
                             current: page.viewMode
                             onActivated: (v) => page.viewMode = v
+                        }
+                    }
+                    RowLayout {
+                        width: parent.width
+                        Text {
+                            Layout.fillWidth: true
+                            text: "Tamanho"
+                            color: Theme.text
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSize
+                        }
+                        SegmentedControl {
+                            model: [{ value: "0.8", label: "P" },
+                                    { value: "1", label: "M" },
+                                    { value: "1.4", label: "G" },
+                                    { value: "1.8", label: "GG" }]
+                            current: String(Theme.chordZoom)
+                            onActivated: (v) => Theme.chordZoom = Number(v)
                         }
                     }
                     RowLayout {
@@ -172,49 +207,53 @@ Rectangle {
                     }
                 }
 
-                // ---- Batida ----
-                Column {
-                    width: parent.width
-                    spacing: 6
-                    visible: !!(page.song && page.song.strum)
-                    SectionTitle { text: page.song && page.song.strum ? page.song.strum.name : "" }
-                    Card {
-                        width: parent.width
-                        Row {
-                            spacing: 2
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            Repeater {
-                                model: page.song && page.song.strum ? page.song.strum.pattern : []
-                                Column {
-                                    id: beat
-                                    required property string modelData
-                                    required property int index
-                                    width: 44
-                                    spacing: 2
-                                    Text {
-                                        width: parent.width
-                                        horizontalAlignment: Text.AlignHCenter
-                                        text: beat.modelData === "" ? "·" : beat.modelData === "U" ? "↑" : "↓"
-                                        color: beat.modelData === "" ? Theme.textDim
-                                             : beat.modelData === "X" ? Theme.textDim : Theme.accent
-                                        font.pixelSize: 26
-                                        font.weight: Font.Bold
-                                    }
-                                    Text {
-                                        width: parent.width
-                                        horizontalAlignment: Text.AlignHCenter
-                                        text: ({ "B": "baixo", "D": "tudo", "d": "acorde", "U": "agudas", "X": "abafa" })[beat.modelData] || " "
-                                        color: Theme.text
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: 10
-                                    }
-                                    Text {
-                                        width: parent.width
-                                        horizontalAlignment: Text.AlignHCenter
-                                        text: page.song.strum.counts[beat.index]
-                                        color: Theme.textDim
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSize - 2
+                // ---- Batidas ----
+                Repeater {
+                    model: page.usedStrums
+                    Column {
+                        id: strumBlock
+                        required property var modelData
+                        width: content.width
+                        spacing: 6
+                        SectionTitle { text: strumBlock.modelData.name }
+                        Card {
+                            width: parent.width
+                            Row {
+                                spacing: 2
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                Repeater {
+                                    model: strumBlock.modelData.pattern
+                                    Column {
+                                        id: beat
+                                        required property string modelData
+                                        required property int index
+                                        width: 44
+                                        spacing: 2
+                                        Text {
+                                            width: parent.width
+                                            horizontalAlignment: Text.AlignHCenter
+                                            text: beat.modelData === "" ? "·" : beat.modelData === "U" ? "↑" : "↓"
+                                            color: beat.modelData === "" ? Theme.textDim
+                                                 : beat.modelData === "X" ? Theme.textDim : Theme.accent
+                                            font.pixelSize: 26
+                                            font.weight: Font.Bold
+                                        }
+                                        Text {
+                                            width: parent.width
+                                            horizontalAlignment: Text.AlignHCenter
+                                            text: ({ "B": "baixo", "D": "tudo", "d": "acorde", "U": "agudas", "X": "abafa" })[beat.modelData] || " "
+                                            color: Theme.text
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 10
+                                        }
+                                        Text {
+                                            width: parent.width
+                                            horizontalAlignment: Text.AlignHCenter
+                                            text: strumBlock.modelData.counts[beat.index] || ""
+                                            color: Theme.textDim
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontSize - 2
+                                        }
                                     }
                                 }
                             }
@@ -228,7 +267,7 @@ Rectangle {
                     visible: page.showFullScore
                     width: parent.width
                     padding: 10
-                    readonly property int perRow: Math.max(1, Math.floor((width - 20 - 48) / 190))
+                    readonly property int perRow: Math.max(1, Math.floor((width - 20 - 48 * page.zoom) / (190 * page.zoom)))
                     Repeater {
                         model: page.showFullScore ? Math.ceil(page.allMeasures.length / fullScoreCard.perRow) : 0
                         ScoreRow {
@@ -237,8 +276,9 @@ Rectangle {
                             height: implicitHeight
                             measures: page.allMeasures.slice(index * fullScoreCard.perRow,
                                                              (index + 1) * fullScoreCard.perRow)
-                            pattern: page.song && page.song.strum ? page.song.strum.pattern : ["D"]
+                            pattern: ["D"]
                             semitones: page.semitones
+                            zoom: page.zoom
                         }
                     }
                 }
@@ -249,6 +289,7 @@ Rectangle {
                     Column {
                         id: section
                         required property var modelData
+                        readonly property var strum: Examples.strumOf(page.song, modelData)
                         width: content.width
                         spacing: 6
 
@@ -284,34 +325,40 @@ Rectangle {
                                     Rectangle {
                                         id: chordBox
                                         required property string modelData
+                                        readonly property string chordName: Examples.chordName(modelData)
+                                        readonly property var voicing: Examples.voicing(page.song, modelData)
+                                        readonly property real zm: page.zoom
                                         readonly property bool diag: page.viewMode === "diagram" && diagram.visible
                                         readonly property bool tab: page.viewMode === "tab" && strumTab.visible
                                         readonly property bool big: page.viewMode === "big" && bigDiagram.visible
                                         readonly property bool score: page.viewMode === "score" && notation.visible
-                                        readonly property real contentW: diag ? diagram.implicitWidth : tab ? strumTab.implicitWidth
-                                                                       : big ? bigDiagram.implicitWidth
+                                        readonly property real contentW: diag ? diagram.implicitWidth * zm : tab ? strumTab.implicitWidth * zm
+                                                                       : big ? bigDiagram.implicitWidth * zm
                                                                        : score ? notation.implicitWidth : 0
-                                        readonly property real contentH: diag ? diagram.implicitHeight : tab ? strumTab.implicitHeight
-                                                                       : big ? bigDiagram.implicitHeight
+                                        readonly property real contentH: diag ? diagram.implicitHeight * zm : tab ? strumTab.implicitHeight * zm
+                                                                       : big ? bigDiagram.implicitHeight * zm
                                                                        : score ? notation.implicitHeight : 0
-                                        width: Math.max(64, contentW + 16, chordText.implicitWidth + 24)
-                                        height: contentH > 0 ? chordText.implicitHeight + contentH + 24 : 44
+                                        width: Math.max(64 * zm, contentW + 16, chordText.implicitWidth + 24)
+                                        height: contentH > 0 ? chordText.implicitHeight + contentH + 24 : chordText.implicitHeight + 20
                                         radius: Theme.radiusSmall
                                         color: Qt.rgba(Theme.chord.r, Theme.chord.g, Theme.chord.b, Theme.dark ? 0.16 : 0.09)
                                         Text {
                                             id: chordText
                                             anchors.horizontalCenter: parent.horizontalCenter
                                             y: chordBox.contentH > 0 ? 8 : (parent.height - height) / 2
-                                            text: page.t(chordBox.modelData)
+                                            text: page.t(chordBox.chordName)
                                             color: Theme.chord
                                             font.family: Theme.monoFamily
-                                            font.pixelSize: Theme.fontSize + 4
+                                            font.pixelSize: (Theme.fontSize + 4) * chordBox.zm
                                             font.weight: Font.Bold
                                         }
                                         ChordDiagram {
                                             id: diagram
+                                            scale: chordBox.zm
+                                            transformOrigin: Item.Top
                                             visible: page.viewMode === "diagram" && shape !== null
-                                            chord: chordBox.modelData
+                                            chord: chordBox.chordName
+                                            voicing: chordBox.voicing
                                             semitones: page.semitones
                                             anchors.horizontalCenter: parent.horizontalCenter
                                             anchors.horizontalCenterOffset: -4
@@ -320,8 +367,11 @@ Rectangle {
                                         }
                                         BigChordDiagram {
                                             id: bigDiagram
+                                            scale: chordBox.zm
+                                            transformOrigin: Item.Top
                                             visible: page.viewMode === "big" && shape !== null
-                                            chord: chordBox.modelData
+                                            chord: chordBox.chordName
+                                            voicing: chordBox.voicing
                                             semitones: page.semitones
                                             anchors.horizontalCenter: parent.horizontalCenter
                                             anchors.horizontalCenterOffset: -8
@@ -330,23 +380,28 @@ Rectangle {
                                         }
                                         NotationView {
                                             id: notation
+                                            zoom: chordBox.zm
                                             visible: page.viewMode === "score" && shape !== null
                                             width: implicitWidth
                                             height: implicitHeight
-                                            chord: chordBox.modelData
+                                            chord: chordBox.chordName
+                                            voicing: chordBox.voicing
                                             semitones: page.semitones
-                                            pattern: page.song && page.song.strum ? page.song.strum.pattern : ["D"]
+                                            pattern: section.strum ? section.strum.pattern : ["D"]
                                             anchors.horizontalCenter: parent.horizontalCenter
                                             anchors.top: chordText.bottom
                                             anchors.topMargin: 4
                                         }
                                         StrumTab {
                                             id: strumTab
+                                            scale: chordBox.zm
+                                            transformOrigin: Item.Top
                                             visible: page.viewMode === "tab" && shape !== null
-                                            chord: chordBox.modelData
+                                            chord: chordBox.chordName
+                                            voicing: chordBox.voicing
                                             semitones: page.semitones
-                                            pattern: page.song && page.song.strum ? page.song.strum.pattern : ["D"]
-                                            counts: page.song && page.song.strum ? page.song.strum.counts : []
+                                            pattern: section.strum ? section.strum.pattern : ["D"]
+                                            counts: section.strum ? section.strum.counts : []
                                             anchors.horizontalCenter: parent.horizontalCenter
                                             anchors.top: chordText.bottom
                                             anchors.topMargin: 6

@@ -11,6 +11,8 @@ Canvas {
     property var measures: []      // [{ chord, number, label, repeat }]
     property var pattern: []
     property int semitones: 0
+    property real zoom: 1            // tamanho escolhido na tela da música
+    readonly property real lw: width / zoom   // largura lógica do desenho
 
     readonly property real gap: 9
     readonly property real tabGap: 11
@@ -21,10 +23,12 @@ Canvas {
     readonly property real tabTop: staffBottom + gap * 6
     readonly property real tabBottom: tabTop + tabGap * 5
 
-    implicitHeight: tabBottom + 14
+    implicitHeight: (tabBottom + 14) * zoom
 
     onMeasuresChanged: requestPaint()
     onSemitonesChanged: requestPaint()
+    onZoomChanged: requestPaint()
+    onPatternChanged: requestPaint()
     onWidthChanged: requestPaint()
     Connections {
         target: Theme
@@ -32,13 +36,12 @@ Canvas {
         function onStyleChanged() { root.requestPaint() }
     }
 
-    function shapeOf(chord) {
-        var json = Music.chordShape(chord, semitones)
-        return json.length ? JSON.parse(json) : null
+    function shapeOf(chord, voicing) {
+        return Examples.shape(chord, semitones, voicing || null)
     }
 
     // Cordas tocadas em cada tempo (mesmas regras do StrumTab).
-    function eventsOf(shape) {
+    function eventsOf(shape, pattern) {
         var out = []
         if (!shape) return out
         var played = []
@@ -57,20 +60,6 @@ Canvas {
             })
         }
         return out
-    }
-
-    function spell(midi, preferFlat) {
-        var written = midi + 12
-        var pc = written % 12
-        var octave = Math.floor(written / 12) - 1
-        var sharpL = [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6]
-        var sharpA = [0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0]
-        var flatL = [0, 1, 1, 2, 2, 3, 4, 4, 5, 5, 6, 6]
-        var flatA = [0, -1, 0, -1, 0, 0, -1, 0, -1, 0, -1, 0]
-        return {
-            step: (preferFlat ? flatL[pc] : sharpL[pc]) + 7 * octave,
-            acc: preferFlat ? flatA[pc] : sharpA[pc]
-        }
     }
 
     function yOf(step) { return staffBottom - (step - 30) * gap / 2 }
@@ -102,9 +91,10 @@ Canvas {
         var ctx = getContext("2d")
         ctx.reset()
         if (measures.length === 0) return
+        ctx.scale(zoom, zoom)
         var ink = Theme.text, dim = Theme.textDim, accent = Theme.accent, chordColor = Theme.chord
         var count = measures.length
-        var mW = (width - clefW - 2) / count
+        var mW = (lw - clefW - 2) / count
 
         // Chave ligando pauta e tab.
         ctx.strokeStyle = ink
@@ -120,11 +110,11 @@ Canvas {
         ctx.lineWidth = 1
         for (var l = 0; l < 5; ++l) {
             var ly = Math.round(staffTop + l * gap) + 0.5
-            ctx.beginPath(); ctx.moveTo(12, ly); ctx.lineTo(width - 1, ly); ctx.stroke()
+            ctx.beginPath(); ctx.moveTo(12, ly); ctx.lineTo(lw - 1, ly); ctx.stroke()
         }
         for (var t = 0; t < 6; ++t) {
             var ty = Math.round(tabTop + t * tabGap) + 0.5
-            ctx.beginPath(); ctx.moveTo(12, ty); ctx.lineTo(width - 1, ty); ctx.stroke()
+            ctx.beginPath(); ctx.moveTo(12, ty); ctx.lineTo(lw - 1, ty); ctx.stroke()
         }
         ctx.beginPath(); ctx.moveTo(12.5, staffTop); ctx.lineTo(12.5, tabBottom); ctx.stroke()
         drawClef(ctx, ink)
@@ -137,9 +127,8 @@ Canvas {
         for (var m = 0; m < count; ++m) {
             var meas = measures[m]
             var x0 = clefW + m * mW
-            var shape = shapeOf(meas.chord)
+            var shape = shapeOf(meas.chord, meas.voicing)
             var name = Music.transposeChord(meas.chord, semitones)
-            var preferFlat = name.indexOf("b") === 1
 
             // Barra de compasso no fim (dupla quando a parte termina).
             ctx.strokeStyle = ink
@@ -165,7 +154,7 @@ Canvas {
             ctx.fillText(name, x0 + 6, 30)
 
             if (!shape) continue
-            var events = eventsOf(shape)
+            var events = eventsOf(shape, meas.pattern || root.pattern)
             var slotW = (mW - 14) / Math.max(1, events.length)
             var open = [40, 45, 50, 55, 59, 64]
             var stems = []
@@ -201,7 +190,7 @@ Canvas {
                 var minY = 1e9, maxY = -1e9, prevStep = -100
                 for (var n = 0; n < ev.strings.length; ++n) {
                     var s = ev.strings[n]
-                    var sp = spell(open[s] + shape.frets[s], preferFlat)
+                    var sp = Examples.spell(open[s] + shape.frets[s], name)
                     var y = yOf(sp.step)
                     minY = Math.min(minY, y); maxY = Math.max(maxY, y)
                     ctx.strokeStyle = dim

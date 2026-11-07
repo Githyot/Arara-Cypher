@@ -11,6 +11,8 @@ Canvas {
     property string chord
     property int semitones: 0
     property var pattern: []
+    property real zoom: 1
+    readonly property real lw: width / zoom
 
     readonly property real gap: 9          // distância entre linhas da pauta
     readonly property real slotW: 28
@@ -18,11 +20,8 @@ Canvas {
     readonly property real staffTop: gap * 6
     readonly property real staffBottom: staffTop + gap * 4
 
-    readonly property var shape: {
-        var json = Music.chordShape(chord, semitones)
-        return json.length ? JSON.parse(json) : null
-    }
-    readonly property bool preferFlat: Music.transposeChord(chord, semitones).indexOf("b") === 1
+    property var voicing: null        // forma tirada da aula (opcional)
+    readonly property var shape: Examples.shape(chord, semitones, voicing)
 
     // Para cada tempo: lista de { midi, muted } ou [] para pausa.
     readonly property var events: {
@@ -48,12 +47,13 @@ Canvas {
         return out
     }
 
-    implicitWidth: clefW + Math.max(1, pattern.length) * slotW + 10
-    implicitHeight: staffBottom + gap * 6
+    implicitWidth: (clefW + Math.max(1, pattern.length) * slotW + 10) * zoom
+    implicitHeight: (staffBottom + gap * 6) * zoom
     visible: shape !== null
 
     onEventsChanged: requestPaint()
-    onPreferFlatChanged: requestPaint()
+    onZoomChanged: requestPaint()
+    onWidthChanged: requestPaint()
     Connections {
         target: Theme
         function onDarkChanged() { root.requestPaint() }
@@ -62,16 +62,7 @@ Canvas {
 
     // Altura escrita (uma oitava acima do som) -> posição diatônica e acidente.
     function spell(midi) {
-        var written = midi + 12
-        var pc = written % 12
-        var octave = Math.floor(written / 12) - 1
-        var sharpL = [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6]
-        var sharpA = [0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0]
-        var flatL = [0, 1, 1, 2, 2, 3, 4, 4, 5, 5, 6, 6]
-        var flatA = [0, -1, 0, -1, 0, 0, -1, 0, -1, 0, -1, 0]
-        var letter = preferFlat ? flatL[pc] : sharpL[pc]
-        var acc = preferFlat ? flatA[pc] : sharpA[pc]
-        return { step: letter + 7 * octave, acc: acc }
+        return Examples.spell(midi, Music.transposeChord(chord, semitones))
     }
 
     // Mi4 (linha de baixo da pauta) = passo diatônico 30.
@@ -102,6 +93,7 @@ Canvas {
         var ctx = getContext("2d")
         ctx.reset()
         if (!shape) return
+        ctx.scale(zoom, zoom)
         var ink = Theme.text
         var dim = Theme.textDim
         var accent = Theme.accent
@@ -111,9 +103,9 @@ Canvas {
         ctx.lineWidth = 1
         for (var l = 0; l < 5; ++l) {
             var ly = Math.round(staffTop + l * gap) + 0.5
-            ctx.beginPath(); ctx.moveTo(2, ly); ctx.lineTo(width - 2, ly); ctx.stroke()
+            ctx.beginPath(); ctx.moveTo(2, ly); ctx.lineTo(lw - 2, ly); ctx.stroke()
         }
-        ctx.beginPath(); ctx.moveTo(width - 2.5, staffTop); ctx.lineTo(width - 2.5, staffBottom); ctx.stroke()
+        ctx.beginPath(); ctx.moveTo(lw - 2.5, staffTop); ctx.lineTo(lw - 2.5, staffBottom); ctx.stroke()
         drawClef(ctx, ink)
 
         var stemTops = []

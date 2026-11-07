@@ -26,10 +26,8 @@ Item {
     readonly property real labelW: showStringNames ? 30 : 6
     readonly property var stringNames: ["E", "A", "D", "G", "B", "e"]
 
-    readonly property var shape: {
-        var json = Music.chordShape(chord, semitones)
-        return json.length ? JSON.parse(json) : null
-    }
+    property var voicing: null        // forma tirada da aula (opcional)
+    readonly property var shape: Examples.shape(chord, semitones, voicing)
 
     // Para cada tempo: lista de 6 valores (corda 0 = Mi grave) com a casa,
     // "x" para abafada ou null se a corda não soa.

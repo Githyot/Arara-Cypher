@@ -12,10 +12,8 @@ Item {
     property real cellW: 30
     property real cellH: 38
 
-    readonly property var shape: {
-        var json = Music.chordShape(chord, semitones)
-        return json.length ? JSON.parse(json) : null
-    }
+    property var voicing: null        // forma tirada da aula (opcional)
+    readonly property var shape: Examples.shape(chord, semitones, voicing)
     readonly property int frets: 5
     readonly property real line: 3
     readonly property real gridW: cellW * 5

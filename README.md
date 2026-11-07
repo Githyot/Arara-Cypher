@@ -20,7 +20,7 @@ no **Android**, com dois visuais à escolha: **GNOME** (Adwaita) e **Apple**.
 Cada build no GitHub Actions gera dois arquivos na aba **Actions** → último
 build → **Artifacts**:
 
-- `araracypher-fedora-rpm`: instale com `sudo dnf install ./araracypher-*.rpm`
+- `araracypher-fedoraNN-rpm`: escolha o NN da sua versão (`rpm -E %fedora`) e instale com `sudo dnf install ./araracypher-*.rpm`
 - `araracypher-android-apk`: copie para o celular e abra para instalar
   (é preciso permitir "instalar apps desconhecidos").
 

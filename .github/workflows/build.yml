@@ -24,9 +24,14 @@ jobs:
       - run: cargo clippy -p araracypher-core -- -D warnings
 
   fedora:
-    name: Fedora (.rpm)
+    # Um .rpm por versão do Fedora: o pacote fica preso à versão do Qt de cada uma.
+    name: Fedora ${{ matrix.fedora }} (.rpm)
     runs-on: ubuntu-latest
-    container: fedora:latest
+    container: fedora:${{ matrix.fedora }}
+    strategy:
+      fail-fast: false
+      matrix:
+        fedora: ["42", "43", "44", "45"]
     steps:
       - name: Dependências
         run: >
@@ -43,7 +48,7 @@ jobs:
         run: cpack -G RPM
       - uses: actions/upload-artifact@v4
         with:
-          name: araracypher-fedora-rpm
+          name: araracypher-fedora${{ matrix.fedora }}-rpm
           path: build/*.rpm
           if-no-files-found: error
 

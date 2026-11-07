@@ -8,7 +8,28 @@ Rectangle {
     id: page
     property var song
     property int semitones: 0
-    property string viewMode: "tab"   // "names" | "diagram" | "tab"
+    property string viewMode: "tab"   // "names" | "diagram" | "big" | "tab" | "score"
+    property bool fullScore: false     // partitura da música inteira, em linhas
+    readonly property bool showFullScore: viewMode === "score" && fullScore
+
+    // Todos os compassos da música em sequência: um por acorde de cada parte.
+    readonly property var allMeasures: {
+        var out = []
+        if (!song) return out
+        var n = 1
+        for (var i = 0; i < song.sections.length; ++i) {
+            var sec = song.sections[i]
+            for (var j = 0; j < sec.chords.length; ++j) {
+                out.push({
+                    chord: sec.chords[j],
+                    number: n++,
+                    label: j === 0 ? sec.name : "",
+                    repeat: j === sec.chords.length - 1 && sec.repeat > 1 ? sec.repeat : 0
+                })
+            }
+        }
+        return out
+    }
     signal back()
 
     color: Theme.window
@@ -126,6 +147,23 @@ Rectangle {
                             onActivated: (v) => page.viewMode = v
                         }
                     }
+                    RowLayout {
+                        visible: page.viewMode === "score"
+                        width: parent.width
+                        Text {
+                            Layout.fillWidth: true
+                            text: "Partitura"
+                            color: Theme.text
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSize
+                        }
+                        SegmentedControl {
+                            model: [{ value: "chord", label: "Por acorde" },
+                                    { value: "full", label: "Música inteira" }]
+                            current: page.fullScore ? "full" : "chord"
+                            onActivated: (v) => page.fullScore = (v === "full")
+                        }
+                    }
                     AppButton {
                         visible: !!(page.song && page.song.video)
                         text: "Assistir à aula no YouTube"
@@ -184,9 +222,30 @@ Rectangle {
                     }
                 }
 
+                // ---- Partitura da música inteira ----
+                Card {
+                    id: fullScoreCard
+                    visible: page.showFullScore
+                    width: parent.width
+                    padding: 10
+                    readonly property int perRow: Math.max(1, Math.floor((width - 20 - 48) / 190))
+                    Repeater {
+                        model: page.showFullScore ? Math.ceil(page.allMeasures.length / fullScoreCard.perRow) : 0
+                        ScoreRow {
+                            required property int index
+                            width: parent.width
+                            height: implicitHeight
+                            measures: page.allMeasures.slice(index * fullScoreCard.perRow,
+                                                             (index + 1) * fullScoreCard.perRow)
+                            pattern: page.song && page.song.strum ? page.song.strum.pattern : ["D"]
+                            semitones: page.semitones
+                        }
+                    }
+                }
+
                 // ---- Seções ----
                 Repeater {
-                    model: page.song ? page.song.sections : []
+                    model: page.song && !page.showFullScore ? page.song.sections : []
                     Column {
                         id: section
                         required property var modelData

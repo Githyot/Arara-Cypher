@@ -19,6 +19,7 @@ fn main() {
         "qml/NavItem.qml",
         "qml/NotationView.qml",
         "qml/PlaceholderPage.qml",
+        "qml/ScoreRow.qml",
         "qml/SectionTitle.qml",
         "qml/SegmentedControl.qml",
     ];

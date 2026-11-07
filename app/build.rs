@@ -8,6 +8,7 @@ fn main() {
         "qml/TunerPage.qml",
         "qml/StudyPage.qml",
         "qml/SettingsPage.qml",
+        "qml/SongPage.qml",
         "qml/AppButton.qml",
         "qml/Card.qml",
         "qml/HeaderBar.qml",
@@ -17,12 +18,13 @@ fn main() {
         "qml/SectionTitle.qml",
         "qml/SegmentedControl.qml",
     ];
-    for f in qml.iter().chain(["qml/style/Theme.qml"].iter()) {
+    let singletons = ["qml/style/Theme.qml", "qml/data/Examples.qml"];
+    for f in qml.iter().chain(singletons.iter()) {
         println!("cargo:rerun-if-changed={f}");
     }
 
     let module = QmlModule::new("AraraCypher")
-        .qml_file(QmlFile::from("qml/style/Theme.qml").singleton(true))
+        .qml_files(singletons.map(|f| QmlFile::from(f).singleton(true)))
         .qml_files(qml);
 
     CxxQtBuilder::new_qml_module(module)

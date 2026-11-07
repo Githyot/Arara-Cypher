@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3584e4"/>
+      <stop offset="1" stop-color="#1c71d8"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="26" fill="url(#bg)"/>
+  <!-- trastes e cordas -->
+  <g stroke="#ffffff" stroke-opacity="0.35" stroke-width="2">
+    <line x1="28" y1="40" x2="100" y2="40"/>
+    <line x1="28" y1="60" x2="100" y2="60"/>
+    <line x1="28" y1="80" x2="100" y2="80"/>
+    <line x1="34" y1="30" x2="34" y2="98"/>
+    <line x1="52" y1="30" x2="52" y2="98"/>
+    <line x1="70" y1="30" x2="70" y2="98"/>
+    <line x1="88" y1="30" x2="88" y2="98"/>
+  </g>
+  <!-- nota musical -->
+  <path fill="#ffffff" d="M58 34l34-8v46a10 10 0 1 1-6-9.2V40l-22 5.2v35a10 10 0 1 1-6-9.2z"/>
+</svg>

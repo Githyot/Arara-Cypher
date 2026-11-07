@@ -1,0 +1,21 @@
+[workspace]
+resolver = "2"
+members = ["core", "app"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/Githyot/Arara-Cypher"
+rust-version = "1.85"
+
+[workspace.dependencies]
+araracypher-core = { path = "core" }
+cxx = "1.0"
+cxx-qt = "0.10"
+cxx-qt-lib = { version = "0.10", features = ["qt_full"] }
+cxx-qt-build = "0.10"
+
+[profile.release]
+lto = "thin"
+strip = true

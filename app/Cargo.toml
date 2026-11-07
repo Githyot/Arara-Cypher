@@ -1,0 +1,23 @@
+[package]
+# Underscore (não hífen): o cxx-qt-cmake procura o pacote pelo nome do alvo.
+name = "araracypher_app"
+description = "Interface Qt/QML do AraraCypher"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lib]
+# Biblioteca estática ligada ao executável C++ mínimo (cpp/main.cpp) pelo CMake.
+# É assim que o cxx-qt gera o APK no Android e o binário no Fedora com o mesmo código.
+crate-type = ["staticlib"]
+
+[dependencies]
+araracypher-core.workspace = true
+cxx.workspace = true
+cxx-qt.workspace = true
+cxx-qt-lib.workspace = true
+
+[build-dependencies]
+cxx-qt-build.workspace = true

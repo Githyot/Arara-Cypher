@@ -49,6 +49,8 @@ jobs:
 
   android:
     name: Android (.apk)
+    # Desligado por enquanto: só roda quando disparado à mão na aba Actions.
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     env:
       QT_VERSION: "6.8.3"

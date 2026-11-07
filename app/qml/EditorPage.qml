@@ -21,6 +21,8 @@ Rectangle {
         }
 
         Flickable {
+
+            ScrollBar.vertical: AppScrollBar {}
             Layout.fillWidth: true
             Layout.fillHeight: true
             contentHeight: content.implicitHeight + 2 * Theme.pagePadding

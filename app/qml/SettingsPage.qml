@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls.Basic
 import QtQuick.Layouts
 import AraraCypher
 
@@ -12,6 +13,8 @@ Rectangle {
         HeaderBar { Layout.fillWidth: true; title: "Ajustes" }
 
         Flickable {
+
+            ScrollBar.vertical: AppScrollBar {}
             Layout.fillWidth: true
             Layout.fillHeight: true
             contentHeight: content.implicitHeight + 2 * Theme.pagePadding

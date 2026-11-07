@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls.Basic
 import QtQuick.Layouts
 import AraraCypher
 
@@ -64,6 +65,8 @@ Rectangle {
         }
 
         Flickable {
+
+            ScrollBar.vertical: AppScrollBar {}
             Layout.fillWidth: true
             Layout.fillHeight: true
             contentHeight: content.implicitHeight + 2 * Theme.pagePadding

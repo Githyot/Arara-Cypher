@@ -8,6 +8,7 @@ Rectangle {
     id: page
     property var song
     property int semitones: 0
+    property bool showDiagrams: true
     signal back()
 
     color: Theme.window
@@ -93,6 +94,22 @@ Rectangle {
                             text: "Original"
                             flat: true
                             onClicked: page.semitones = 0
+                        }
+                    }
+                    Rectangle { width: parent.width; height: 1; color: Theme.border; opacity: 0.6 }
+                    RowLayout {
+                        width: parent.width
+                        Text {
+                            Layout.fillWidth: true
+                            text: "Mostrar desenho dos acordes"
+                            color: Theme.text
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSize
+                        }
+                        SegmentedControl {
+                            model: [{ value: "on", label: "Sim" }, { value: "off", label: "Não" }]
+                            current: page.showDiagrams ? "on" : "off"
+                            onActivated: (v) => page.showDiagrams = (v === "on")
                         }
                     }
                     AppButton {
@@ -182,19 +199,34 @@ Rectangle {
                                 Repeater {
                                     model: section.modelData.chords
                                     Rectangle {
+                                        id: chordBox
                                         required property string modelData
-                                        width: Math.max(64, chordText.implicitWidth + 24)
-                                        height: 44
+                                        width: Math.max(page.showDiagrams ? diagram.implicitWidth + 16 : 64,
+                                                        chordText.implicitWidth + 24)
+                                        height: page.showDiagrams && diagram.visible
+                                                ? chordText.implicitHeight + diagram.implicitHeight + 24
+                                                : 44
                                         radius: Theme.radiusSmall
                                         color: Qt.rgba(Theme.chord.r, Theme.chord.g, Theme.chord.b, Theme.dark ? 0.16 : 0.09)
                                         Text {
                                             id: chordText
-                                            anchors.centerIn: parent
-                                            text: page.t(parent.modelData)
+                                            anchors.horizontalCenter: parent.horizontalCenter
+                                            y: page.showDiagrams && diagram.visible ? 8 : (parent.height - height) / 2
+                                            text: page.t(chordBox.modelData)
                                             color: Theme.chord
                                             font.family: Theme.monoFamily
                                             font.pixelSize: Theme.fontSize + 4
                                             font.weight: Font.Bold
+                                        }
+                                        ChordDiagram {
+                                            id: diagram
+                                            visible: page.showDiagrams && shape !== null
+                                            chord: chordBox.modelData
+                                            semitones: page.semitones
+                                            anchors.horizontalCenter: parent.horizontalCenter
+                                            anchors.horizontalCenterOffset: -4
+                                            anchors.top: chordText.bottom
+                                            anchors.topMargin: 6
                                         }
                                     }
                                 }

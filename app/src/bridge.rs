@@ -20,6 +20,11 @@ pub mod qobject {
         #[cxx_name = "transposeChord"]
         fn transpose_chord(&self, name: &QString, semitones: i32) -> QString;
 
+        /// Forma do acorde (já transposto) no braço, em JSON; vazio se não souber.
+        #[qinvokable]
+        #[cxx_name = "chordShape"]
+        fn chord_shape(&self, name: &QString, semitones: i32) -> QString;
+
         /// Verdadeiro se o texto é um nome de acorde válido.
         #[qinvokable]
         #[cxx_name = "isChord"]
@@ -27,7 +32,7 @@ pub mod qobject {
     }
 }
 
-use araracypher_core::{chord, Chord};
+use araracypher_core::{chord, shape, Chord};
 use cxx_qt_lib::QString;
 
 pub struct MusicRust {
@@ -45,6 +50,11 @@ impl Default for MusicRust {
 impl qobject::Music {
     pub fn transpose_chord(&self, name: &QString, semitones: i32) -> QString {
         QString::from(chord::transpose_name(&name.to_string(), semitones).as_str())
+    }
+
+    pub fn chord_shape(&self, name: &QString, semitones: i32) -> QString {
+        let transposed = chord::transpose_name(&name.to_string(), semitones);
+        QString::from(shape::shape_json(&transposed).as_str())
     }
 
     pub fn is_chord(&self, name: &QString) -> bool {

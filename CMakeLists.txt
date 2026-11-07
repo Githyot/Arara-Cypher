@@ -9,7 +9,9 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 QmlImportScanner)
+find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2)
+# Ferramenta só do desktop; no Android o androiddeployqt faz essa varredura.
+find_package(Qt6 6.4 QUIET OPTIONAL_COMPONENTS QmlImportScanner)
 
 # Com o Android NDK, o Rust precisa compilar para o mesmo processador do APK.
 if(ANDROID)
@@ -48,7 +50,12 @@ cxx_qt_import_qml_module(araracypher_qml_module
 
 qt_add_executable(araracypher cpp/main.cpp)
 target_link_libraries(araracypher PRIVATE araracypher_qml_module Qt::Quick Qt::QuickControls2)
-qt_import_qml_plugins(araracypher)
+if(TARGET Qt6::qmlimportscanner OR Qt6QmlImportScanner_FOUND)
+    qt_import_qml_plugins(araracypher)
+endif()
+# Onde o androiddeployqt procura os imports QML para empacotar no APK.
+set_property(TARGET araracypher APPEND PROPERTY
+    QT_QML_ROOT_PATH "${CMAKE_CURRENT_SOURCE_DIR}/app/qml")
 
 set_target_properties(araracypher PROPERTIES
     QT_ANDROID_PACKAGE_NAME "io.github.githyot.araracypher"

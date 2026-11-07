@@ -50,6 +50,29 @@ QtObject {
                 { name: "Refrão", repeat: 2, chords: ["Bm", "C#m", "F#m"] },
                 { name: "Final", repeat: 1, chords: ["Bm", "C#m", "F#m"] }
             ]
+        },
+        {
+            title: "The Only Exception",
+            artist: "Paramore",
+            key: "B",
+            source: "Cifra enviada pelo HP",
+            strum: {
+                name: "Batida: balada (sugestão)",
+                pattern: ["B", "", "d", "U", "", "U", "d", "U"],
+                counts: ["1", "e", "2", "e", "3", "e", "4", "e"]
+            },
+            sections: [
+                { name: "Intro", repeat: 2, chords: ["Badd4", "F#m7", "Emaj7"] },
+                { name: "Verso", repeat: 4, chords: ["Badd4", "F#m7", "Emaj7"] },
+                { name: "Refrão", repeat: 2, chords: ["Badd4", "F#m11", "E"] },
+                { name: "Passagem", repeat: 1, chords: ["Badd4"] },
+                { name: "Verso 2", repeat: 4, chords: ["Badd4", "F#m7", "Emaj7"] },
+                { name: "Refrão", repeat: 2, chords: ["Badd4", "F#m11", "E"] },
+                { name: "Ponte", repeat: 4, chords: ["C#m7", "Badd4", "F#7add4"] },
+                { name: "Refrão final", repeat: 1, note: "Entra com um E antes", chords: ["E", "Badd4", "F#m11", "E"] },
+                { name: "Refrão final (repete)", repeat: 3, chords: ["Badd4", "F#m11", "E"] },
+                { name: "Final", repeat: 1, chords: ["F#m11", "E", "Badd4", "F#m11", "E", "Badd4"] }
+            ]
         }
     ]
 }

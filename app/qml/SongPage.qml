@@ -49,7 +49,7 @@ Rectangle {
                         font.pixelSize: Theme.fontSize + 2
                     }
                     Text {
-                        visible: page.song && page.song.source
+                        visible: !!(page.song && page.song.source)
                         text: page.song ? page.song.source : ""
                         color: Theme.textDim
                         font.family: Theme.fontFamily
@@ -119,13 +119,14 @@ Rectangle {
                         SegmentedControl {
                             model: [{ value: "names", label: "Nomes" },
                                     { value: "diagram", label: "Braço" },
+                                    { value: "big", label: "Grande" },
                                     { value: "tab", label: "Tab" }]
                             current: page.viewMode
                             onActivated: (v) => page.viewMode = v
                         }
                     }
                     AppButton {
-                        visible: page.song && page.song.video
+                        visible: !!(page.song && page.song.video)
                         text: "Assistir à aula no YouTube"
                         suggested: true
                         onClicked: Qt.openUrlExternally(page.song.video)
@@ -136,7 +137,7 @@ Rectangle {
                 Column {
                     width: parent.width
                     spacing: 6
-                    visible: page.song && page.song.strum
+                    visible: !!(page.song && page.song.strum)
                     SectionTitle { text: page.song && page.song.strum ? page.song.strum.name : "" }
                     Card {
                         width: parent.width
@@ -225,8 +226,11 @@ Rectangle {
                                         required property string modelData
                                         readonly property bool diag: page.viewMode === "diagram" && diagram.visible
                                         readonly property bool tab: page.viewMode === "tab" && strumTab.visible
-                                        readonly property real contentW: diag ? diagram.implicitWidth : tab ? strumTab.implicitWidth : 0
-                                        readonly property real contentH: diag ? diagram.implicitHeight : tab ? strumTab.implicitHeight : 0
+                                        readonly property bool big: page.viewMode === "big" && bigDiagram.visible
+                                        readonly property real contentW: diag ? diagram.implicitWidth : tab ? strumTab.implicitWidth
+                                                                       : big ? bigDiagram.implicitWidth : 0
+                                        readonly property real contentH: diag ? diagram.implicitHeight : tab ? strumTab.implicitHeight
+                                                                       : big ? bigDiagram.implicitHeight : 0
                                         width: Math.max(64, contentW + 16, chordText.implicitWidth + 24)
                                         height: contentH > 0 ? chordText.implicitHeight + contentH + 24 : 44
                                         radius: Theme.radiusSmall
@@ -250,6 +254,16 @@ Rectangle {
                                             anchors.horizontalCenterOffset: -4
                                             anchors.top: chordText.bottom
                                             anchors.topMargin: 6
+                                        }
+                                        BigChordDiagram {
+                                            id: bigDiagram
+                                            visible: page.viewMode === "big" && shape !== null
+                                            chord: chordBox.modelData
+                                            semitones: page.semitones
+                                            anchors.horizontalCenter: parent.horizontalCenter
+                                            anchors.horizontalCenterOffset: -8
+                                            anchors.top: chordText.bottom
+                                            anchors.topMargin: 8
                                         }
                                         StrumTab {
                                             id: strumTab

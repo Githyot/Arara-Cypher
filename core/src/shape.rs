@@ -73,6 +73,9 @@ enum Quality {
     Dim,
     Six,
     Min6,
+    Add4,
+    Min11,
+    Dom7Add4,
 }
 
 fn quality(suffix: &str) -> Option<Quality> {
@@ -92,6 +95,9 @@ fn quality(suffix: &str) -> Option<Quality> {
         "°" | "dim" | "º" | "o" => Quality::Dim,
         "6" => Quality::Six,
         "m6" => Quality::Min6,
+        "add4" | "(add4)" | "add11" | "(4)" => Quality::Add4,
+        "m11" | "m7(11)" | "m7add11" => Quality::Min11,
+        "7add4" | "7(4)" | "7(11)" | "7add11" => Quality::Dom7Add4,
         _ => return None,
     })
 }
@@ -115,7 +121,9 @@ fn e_shape(q: Quality) -> Option<Tpl> {
         Quality::Dim => [(0, 2), X, (-1, 1), (0, 3), (-1, 1), X],
         Quality::Six => [(0, 2), X, (-1, 1), (1, 3), (0, 4), X],
         Quality::Min6 => [(0, 2), X, (-1, 1), (0, 3), (0, 4), X],
-        Quality::Dom9 | Quality::Sus2 => return None,
+        Quality::Min11 => [(0, 2), X, (0, 3), (0, 4), (-2, 1), (-2, 1)],
+        Quality::Dom7Add4 => [(0, 2), X, (0, 3), (1, 4), (-2, 1), (-2, 1)],
+        Quality::Dom9 | Quality::Sus2 | Quality::Add4 => return None,
     })
 }
 
@@ -136,6 +144,9 @@ fn a_shape(q: Quality) -> Option<Tpl> {
         Quality::Dim => [X, (0, 2), (1, 3), (2, 4), (1, 1), X],
         Quality::Six => [X, (0, 1), (2, 3), (2, 3), (2, 3), (2, 3)],
         Quality::Min6 => [X, (0, 2), (-1, 1), (1, 3), (0, 1), X],
+        // Sem a terça, como o Badd4 x24400: na prática soa como um sus4.
+        Quality::Add4 => [X, (0, 1), (2, 2), (2, 3), (3, 4), (0, 1)],
+        Quality::Min11 | Quality::Dom7Add4 => return None,
     })
 }
 
@@ -163,6 +174,7 @@ const OPEN: &[OpenShape] = &[
     (4,  Quality::Dom7,  [0, 2, 0, 1, 0, 0], [0, 2, 0, 1, 0, 0], 0), // E7
     (4,  Quality::Min7,  [0, 2, 0, 0, 0, 0], [0, 2, 0, 0, 0, 0], 0), // Em7
     (4,  Quality::Power, [0, 2, 2, -1, -1, -1], [0, 1, 2, 0, 0, 0], 0), // E5
+    (4,  Quality::Maj7,  [0, 2, 1, 1, 0, 0], [0, 3, 1, 2, 0, 0], 0), // E7M
     (4,  Quality::Sus4,  [0, 2, 2, 2, 0, 0], [0, 2, 3, 4, 0, 0], 0), // Esus4
     (7,  Quality::Major, [3, 2, 0, 0, 0, 3], [2, 1, 0, 0, 0, 3], 0), // G
     (7,  Quality::Dom7,  [3, 2, 0, 0, 0, 1], [3, 2, 0, 0, 0, 1], 0), // G7
@@ -175,6 +187,7 @@ const OPEN: &[OpenShape] = &[
     (9,  Quality::Sus4,  [-1, 0, 2, 2, 3, 0], [0, 0, 1, 2, 3, 0], 1), // Asus4
     (9,  Quality::Sus2,  [-1, 0, 2, 2, 0, 0], [0, 0, 1, 2, 0, 0], 1), // Asus2
     (11, Quality::Dom7,  [-1, 2, 1, 2, 0, 2], [0, 2, 1, 3, 0, 4], 1), // B7
+    (11, Quality::Add4,  [-1, 2, 4, 4, 0, 0], [0, 1, 3, 4, 0, 0], 1), // Badd4
 ];
 
 fn from_template(tpl: &Tpl, root_fret: i8, root_string: usize) -> Option<ChordShape> {
@@ -275,11 +288,18 @@ mod tests {
         assert_eq!(frets("Bb9(7)"), [-1, 1, 0, 1, 1, 1]);
         assert_eq!(frets("G#5"), [4, 6, 6, -1, -1, -1]);
         assert_eq!(frets("Bm"), [-1, 2, 4, 4, 3, 2]);
+        assert_eq!(frets("F#m11"), [2, -1, 2, 2, 0, 0]);
+        assert_eq!(frets("F#7add4"), [2, -1, 2, 3, 0, 0]);
+        assert_eq!(frets("Badd4"), [-1, 2, 4, 4, 0, 0]);
+        assert_eq!(frets("Emaj7"), [0, 2, 1, 1, 0, 0]);
+        assert_eq!(frets("C#m7"), [-1, 4, 6, 4, 5, 4]);
     }
 
     #[test]
     fn transposed_chords_still_have_shapes() {
-        for name in ["Fm7", "C#5", "Bb9(7)", "F#5(9)", "G#5", "F5", "Bb5"] {
+        for name in [
+            "Fm7", "C#5", "Bb9(7)", "F#5(9)", "G#5", "F5", "Bb5", "Badd4", "F#m11", "F#7add4",
+        ] {
             let chord: Chord = name.parse().unwrap();
             for st in 0..12 {
                 assert!(shape_for(&chord.transpose(st)).is_some(), "{name} +{st}");

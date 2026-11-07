@@ -136,7 +136,8 @@ QtObject {
                 { name: "Intro", repeat: 5, chords: ["Fm7", "C#5@A", "Bb9(7)", "F#5(9)"] },
                 { name: "Parte A", repeat: 1, chords: ["Fm7", "C#5@A", "Bb9(7)", "F#5(9)"] },
                 { name: "Parte B", repeat: 1, strum: 1, chords: ["C#5", "G#5", "F5", "Bb5", "G#5"] },
-                { name: "Solo", repeat: 1, note: "Riff de uma nota só sobre a base", chords: ["Fm7", "C#5@A", "Bb9(7)", "F#5(9)"] },
+                { name: "Solo (riff)", repeat: 1, chords: [],
+                  note: "O solo é um riff de notas soltas, não acordes. A tab está na videoaula em 2:53. Para guardar no app, toque em Editar e cole a tab na parte Solo da sua cópia." },
                 { name: "Parte A (variação)", repeat: 1, chords: ["Fm7", "F#5", "Bb9(7)", "F#5(9)", "Fm7", "C#5@A", "Bb9(7)", "F#5(9)"] },
                 { name: "Parte B", repeat: 1, strum: 1, chords: ["C#5", "G#5", "F5", "Bb5", "G#5"] },
                 { name: "Final", repeat: 1, chords: ["Fm7", "C#5@A", "Bb9(7)", "F#5(9)", "Fm7", "C#5@A", "Bb9(7)"] }

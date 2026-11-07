@@ -27,16 +27,19 @@ Rectangle {
         return out
     }
 
-    // Todos os compassos da música em sequência: um por acorde de cada parte.
-    readonly property var allMeasures: {
+    // Partitura da música inteira em blocos: compassos de acordes (um por
+    // acorde) e, no meio, os riffs/solos colados como tab.
+    readonly property var scoreBlocks: {
         var out = []
         if (!song) return out
         var n = 1
+        var cur = null
         for (var i = 0; i < song.sections.length; ++i) {
             var sec = song.sections[i]
+            var strum = Examples.strumOf(song, sec)
             for (var j = 0; j < sec.chords.length; ++j) {
-                var strum = Examples.strumOf(song, sec)
-                out.push({
+                if (!cur) { cur = { tab: "", measures: [] }; out.push(cur) }
+                cur.measures.push({
                     chord: Examples.chordName(sec.chords[j]),
                     voicing: Examples.voicing(song, sec.chords[j]),
                     pattern: strum ? strum.pattern : ["D"],
@@ -45,10 +48,20 @@ Rectangle {
                     repeat: j === sec.chords.length - 1 && sec.repeat > 1 ? sec.repeat : 0
                 })
             }
+            if (sec.tab && sec.tab.length > 0) {
+                cur = null
+                var events = JSON.parse(Music.parseTab(sec.tab))
+                if (events.length === 0) continue
+                var bars = events.filter(function (e) { return e.bar }).length
+                out.push({ tab: sec.tab, measures: [], start: n,
+                           label: sec.name + (sec.repeat > 1 ? " (" + sec.repeat + "×)" : "") })
+                n += bars + 1
+            }
         }
         return out
     }
     signal back()
+    signal edit()
 
     color: Theme.window
 
@@ -61,6 +74,11 @@ Rectangle {
         HeaderBar {
             Layout.fillWidth: true
             title: page.song ? page.song.title : ""
+            AppButton {
+                text: page.song && page.song.id ? "Editar" : "Editar uma cópia"
+                flat: true
+                onClicked: page.edit()
+            }
             AppButton { text: "Voltar"; flat: true; onClicked: page.back() }
         }
 
@@ -84,7 +102,7 @@ Rectangle {
                     width: parent.width
                     spacing: 2
                     Text {
-                        text: page.song ? page.song.artist : ""
+                        text: page.song ? (page.song.artist || "") : ""
                         color: Theme.textDim
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSize + 2
@@ -272,16 +290,35 @@ Rectangle {
                     padding: 10
                     readonly property int perRow: Math.max(1, Math.floor((width - 20 - 48 * page.zoom) / (190 * page.zoom)))
                     Repeater {
-                        model: page.showFullScore ? Math.ceil(page.allMeasures.length / fullScoreCard.perRow) : 0
-                        ScoreRow {
-                            required property int index
-                            width: parent.width
-                            height: implicitHeight
-                            measures: page.allMeasures.slice(index * fullScoreCard.perRow,
-                                                             (index + 1) * fullScoreCard.perRow)
-                            pattern: ["D"]
-                            semitones: page.semitones
-                            zoom: page.zoom
+                        model: page.showFullScore ? page.scoreBlocks : []
+                        Column {
+                            id: block
+                            required property var modelData
+                            width: fullScoreCard.width - 20
+                            Repeater {
+                                model: block.modelData.tab ? 0 : Math.ceil(block.modelData.measures.length / fullScoreCard.perRow)
+                                ScoreRow {
+                                    required property int index
+                                    width: block.width
+                                    height: implicitHeight
+                                    measures: block.modelData.measures.slice(index * fullScoreCard.perRow,
+                                                                             (index + 1) * fullScoreCard.perRow)
+                                    pattern: ["D"]
+                                    slots: fullScoreCard.perRow
+                                    semitones: page.semitones
+                                    zoom: page.zoom
+                                }
+                            }
+                            TabScore {
+                                visible: !!block.modelData.tab
+                                width: block.width
+                                height: implicitHeight
+                                tab: block.modelData.tab || ""
+                                label: block.modelData.label || ""
+                                startNumber: block.modelData.start || 0
+                                keyName: page.song ? page.t(page.song.key) : "C"
+                                zoom: page.zoom
+                            }
                         }
                     }
                 }
@@ -320,7 +357,22 @@ Rectangle {
 
                         Card {
                             width: parent.width
+                            TabText {
+                                visible: !!section.modelData.tab && page.viewMode !== "tab" && page.viewMode !== "score"
+                                width: parent.width
+                                tab: section.modelData.tab || ""
+                                zoom: page.zoom
+                            }
+                            TabScore {
+                                visible: !!section.modelData.tab && (page.viewMode === "tab" || page.viewMode === "score")
+                                width: parent.width
+                                height: implicitHeight
+                                tab: visible ? section.modelData.tab : ""
+                                keyName: page.song ? page.t(page.song.key) : "C"
+                                zoom: page.zoom
+                            }
                             Flow {
+                                visible: section.modelData.chords.length > 0
                                 width: parent.width
                                 spacing: 8
                                 Repeater {

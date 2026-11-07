@@ -4,7 +4,11 @@
 //! sem precisar do Qt instalado.
 
 pub mod chord;
+pub mod library;
+pub mod ocr;
 pub mod shape;
+pub mod sheet;
+pub mod tab;
 
 pub use chord::{Accidental, Chord, Note, ParseChordError};
 pub use shape::{shape_for, ChordShape};

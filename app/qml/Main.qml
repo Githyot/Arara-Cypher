@@ -101,8 +101,17 @@ ApplicationWindow {
                 Layout.fillHeight: true
                 currentIndex: window.currentPage
 
-                LibraryPage { onRequestPage: (i) => window.currentPage = i }
-                EditorPage {}
+                LibraryPage {
+                    id: libraryPage
+                    onRequestPage: (i) => window.currentPage = i
+                    onNewSong: { editorPage.load(null); window.currentPage = 1 }
+                    onEditSong: (song) => { editorPage.load(song); window.currentPage = 1 }
+                }
+                EditorPage {
+                    id: editorPage
+                    onSaved: (song) => { libraryPage.showSong(song); window.currentPage = 0 }
+                    onClosed: window.currentPage = 0
+                }
                 TunerPage {}
                 StudyPage {}
                 SettingsPage {}

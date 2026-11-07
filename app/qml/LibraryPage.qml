@@ -8,7 +8,20 @@ import AraraCypher
 Rectangle {
     id: page
     signal requestPage(int index)
+    signal editSong(var song)
+    signal newSong()
     property var openSong: null
+
+    readonly property var mySongs: {
+        Library.revision
+        return JSON.parse(Library.songs())
+    }
+
+    // Abre uma música salva pelo id (depois de salvar no editor).
+    function showSong(song) {
+        openSong = null
+        openSong = song
+    }
     color: Theme.window
 
     ColumnLayout {
@@ -22,7 +35,7 @@ Rectangle {
             AppButton {
                 iconName: "add"
                 flat: true
-                onClicked: page.requestPage(1)
+                onClicked: page.newSong()
             }
         }
 
@@ -41,10 +54,19 @@ Rectangle {
                 x: (parent.width - width) / 2
                 spacing: 8
 
-                SectionTitle { text: "Exemplos" }
+                Repeater {
+                    model: [{ title: "Minhas cifras", songs: page.mySongs },
+                            { title: "Exemplos", songs: Examples.songs }]
+                    Column {
+                        id: group
+                        required property var modelData
+                        width: list.width
+                        spacing: 8
+                        visible: modelData.songs.length > 0
+                SectionTitle { text: group.modelData.title }
 
                 Repeater {
-                    model: Examples.songs
+                    model: group.modelData.songs
                     Card {
                         id: songCard
                         required property var modelData
@@ -80,7 +102,7 @@ Rectangle {
                                 }
                                 Text {
                                     width: parent.width
-                                    text: songCard.modelData.artist + " · Tom " + songCard.modelData.key
+                                    text: (songCard.modelData.artist || "Sem artista") + " · Tom " + (songCard.modelData.key || "?")
                                       + (songCard.modelData.capo ? " · Capo " + songCard.modelData.capo + "ª" : "")
                                     color: Theme.textDim
                                     elide: Text.ElideRight
@@ -103,6 +125,8 @@ Rectangle {
                         }
                     }
                 }
+                    }
+                }
 
                 Item { width: 1; height: 16 }
 
@@ -110,7 +134,8 @@ Rectangle {
                     width: parent.width
                     wrapMode: Text.WordWrap
                     horizontalAlignment: Text.AlignHCenter
-                    text: "Suas cifras vão aparecer aqui quando o editor ficar pronto."
+                    visible: page.mySongs.length === 0
+                    text: "Toque em + para escrever uma cifra, colar uma do site ou importar de um print. Elas ficam salvas só no seu computador."
                     color: Theme.textDim
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSize - 1
@@ -125,6 +150,7 @@ Rectangle {
         sourceComponent: SongPage {
             song: page.openSong
             onBack: page.openSong = null
+            onEdit: page.editSong(page.openSong)
         }
     }
 }

@@ -11,7 +11,8 @@ Canvas {
     property var measures: []      // [{ chord, number, label, repeat }]
     property var pattern: []
     property int semitones: 0
-    property real zoom: 1            // tamanho escolhido na tela da música
+    property real zoom: 1
+    property int slots: 0            // compassos que cabem na linha (linhas incompletas não esticam)            // tamanho escolhido na tela da música
     readonly property real lw: width / zoom   // largura lógica do desenho
 
     readonly property real gap: 9
@@ -28,6 +29,7 @@ Canvas {
     onMeasuresChanged: requestPaint()
     onSemitonesChanged: requestPaint()
     onZoomChanged: requestPaint()
+    onSlotsChanged: requestPaint()
     onPatternChanged: requestPaint()
     onWidthChanged: requestPaint()
     Connections {
@@ -94,7 +96,8 @@ Canvas {
         ctx.scale(zoom, zoom)
         var ink = Theme.text, dim = Theme.textDim, accent = Theme.accent, chordColor = Theme.chord
         var count = measures.length
-        var mW = (lw - clefW - 2) / count
+        var mW = (lw - clefW - 2) / Math.max(count, slots)
+        var lineEnd = Math.min(lw - 1, clefW + count * mW + 1)
 
         // Chave ligando pauta e tab.
         ctx.strokeStyle = ink
@@ -110,11 +113,11 @@ Canvas {
         ctx.lineWidth = 1
         for (var l = 0; l < 5; ++l) {
             var ly = Math.round(staffTop + l * gap) + 0.5
-            ctx.beginPath(); ctx.moveTo(12, ly); ctx.lineTo(lw - 1, ly); ctx.stroke()
+            ctx.beginPath(); ctx.moveTo(12, ly); ctx.lineTo(lineEnd, ly); ctx.stroke()
         }
         for (var t = 0; t < 6; ++t) {
             var ty = Math.round(tabTop + t * tabGap) + 0.5
-            ctx.beginPath(); ctx.moveTo(12, ty); ctx.lineTo(lw - 1, ty); ctx.stroke()
+            ctx.beginPath(); ctx.moveTo(12, ty); ctx.lineTo(lineEnd, ty); ctx.stroke()
         }
         ctx.beginPath(); ctx.moveTo(12.5, staffTop); ctx.lineTo(12.5, tabBottom); ctx.stroke()
         drawClef(ctx, ink)

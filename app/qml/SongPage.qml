@@ -120,7 +120,8 @@ Rectangle {
                             model: [{ value: "names", label: "Nomes" },
                                     { value: "diagram", label: "Braço" },
                                     { value: "big", label: "Grande" },
-                                    { value: "tab", label: "Tab" }]
+                                    { value: "tab", label: "Tab" },
+                                    { value: "score", label: "Partitura" }]
                             current: page.viewMode
                             onActivated: (v) => page.viewMode = v
                         }
@@ -227,10 +228,13 @@ Rectangle {
                                         readonly property bool diag: page.viewMode === "diagram" && diagram.visible
                                         readonly property bool tab: page.viewMode === "tab" && strumTab.visible
                                         readonly property bool big: page.viewMode === "big" && bigDiagram.visible
+                                        readonly property bool score: page.viewMode === "score" && notation.visible
                                         readonly property real contentW: diag ? diagram.implicitWidth : tab ? strumTab.implicitWidth
-                                                                       : big ? bigDiagram.implicitWidth : 0
+                                                                       : big ? bigDiagram.implicitWidth
+                                                                       : score ? notation.implicitWidth : 0
                                         readonly property real contentH: diag ? diagram.implicitHeight : tab ? strumTab.implicitHeight
-                                                                       : big ? bigDiagram.implicitHeight : 0
+                                                                       : big ? bigDiagram.implicitHeight
+                                                                       : score ? notation.implicitHeight : 0
                                         width: Math.max(64, contentW + 16, chordText.implicitWidth + 24)
                                         height: contentH > 0 ? chordText.implicitHeight + contentH + 24 : 44
                                         radius: Theme.radiusSmall
@@ -264,6 +268,18 @@ Rectangle {
                                             anchors.horizontalCenterOffset: -8
                                             anchors.top: chordText.bottom
                                             anchors.topMargin: 8
+                                        }
+                                        NotationView {
+                                            id: notation
+                                            visible: page.viewMode === "score" && shape !== null
+                                            width: implicitWidth
+                                            height: implicitHeight
+                                            chord: chordBox.modelData
+                                            semitones: page.semitones
+                                            pattern: page.song && page.song.strum ? page.song.strum.pattern : ["D"]
+                                            anchors.horizontalCenter: parent.horizontalCenter
+                                            anchors.top: chordText.bottom
+                                            anchors.topMargin: 4
                                         }
                                         StrumTab {
                                             id: strumTab

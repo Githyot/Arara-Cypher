@@ -17,6 +17,7 @@ fn main() {
         "qml/HeaderBar.qml",
         "qml/Icon.qml",
         "qml/NavItem.qml",
+        "qml/NotationView.qml",
         "qml/PlaceholderPage.qml",
         "qml/SectionTitle.qml",
         "qml/SegmentedControl.qml",

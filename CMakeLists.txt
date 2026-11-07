@@ -37,10 +37,18 @@ if(NOT CxxQt_FOUND)
     FetchContent_MakeAvailable(CxxQt)
 endif()
 
+# No Android, o qmake do Qt para Android (um script que aponta para os headers
+# do alvo) precisa ser usado; o padrão pegaria o qmake do host e os headers errados.
+set(ARARA_QMAKE_ARG "")
+if(ANDROID)
+    set(ARARA_QMAKE_ARG QMAKE "${QT6_INSTALL_PREFIX}/${QT6_INSTALL_BINS}/qmake")
+endif()
+
 cxx_qt_import_crate(
     MANIFEST_PATH app/Cargo.toml
     CRATES araracypher_app
     LOCKED
+    ${ARARA_QMAKE_ARG}
     QT_MODULES Qt::Core Qt::Gui Qt::Qml Qt::Quick Qt::QuickControls2
 )
 

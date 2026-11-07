@@ -8,7 +8,7 @@ Rectangle {
     id: page
     property var song
     property int semitones: 0
-    property bool showDiagrams: true
+    property string viewMode: "tab"   // "names" | "diagram" | "tab"
     signal back()
 
     color: Theme.window
@@ -101,15 +101,17 @@ Rectangle {
                         width: parent.width
                         Text {
                             Layout.fillWidth: true
-                            text: "Mostrar desenho dos acordes"
+                            text: "Ver acordes como"
                             color: Theme.text
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSize
                         }
                         SegmentedControl {
-                            model: [{ value: "on", label: "Sim" }, { value: "off", label: "Não" }]
-                            current: page.showDiagrams ? "on" : "off"
-                            onActivated: (v) => page.showDiagrams = (v === "on")
+                            model: [{ value: "names", label: "Nomes" },
+                                    { value: "diagram", label: "Braço" },
+                                    { value: "tab", label: "Tab" }]
+                            current: page.viewMode
+                            onActivated: (v) => page.viewMode = v
                         }
                     }
                     AppButton {
@@ -129,27 +131,37 @@ Rectangle {
                     Card {
                         width: parent.width
                         Row {
-                            spacing: 4
+                            spacing: 2
                             anchors.horizontalCenter: parent.horizontalCenter
                             Repeater {
                                 model: page.song && page.song.strum ? page.song.strum.pattern : []
                                 Column {
+                                    id: beat
                                     required property string modelData
                                     required property int index
-                                    width: 36
+                                    width: 44
                                     spacing: 2
                                     Text {
                                         width: parent.width
                                         horizontalAlignment: Text.AlignHCenter
-                                        text: modelData.length ? modelData : "·"
-                                        color: modelData.length ? Theme.accent : Theme.textDim
+                                        text: beat.modelData === "" ? "·" : beat.modelData === "U" ? "↑" : "↓"
+                                        color: beat.modelData === "" ? Theme.textDim
+                                             : beat.modelData === "X" ? Theme.textDim : Theme.accent
                                         font.pixelSize: 26
                                         font.weight: Font.Bold
                                     }
                                     Text {
                                         width: parent.width
                                         horizontalAlignment: Text.AlignHCenter
-                                        text: page.song.strum.counts[index]
+                                        text: ({ "B": "baixo", "D": "tudo", "d": "acorde", "U": "agudas", "X": "abafa" })[beat.modelData] || " "
+                                        color: Theme.text
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 10
+                                    }
+                                    Text {
+                                        width: parent.width
+                                        horizontalAlignment: Text.AlignHCenter
+                                        text: page.song.strum.counts[beat.index]
                                         color: Theme.textDim
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSize - 2
@@ -201,17 +213,18 @@ Rectangle {
                                     Rectangle {
                                         id: chordBox
                                         required property string modelData
-                                        width: Math.max(page.showDiagrams ? diagram.implicitWidth + 16 : 64,
-                                                        chordText.implicitWidth + 24)
-                                        height: page.showDiagrams && diagram.visible
-                                                ? chordText.implicitHeight + diagram.implicitHeight + 24
-                                                : 44
+                                        readonly property bool diag: page.viewMode === "diagram" && diagram.visible
+                                        readonly property bool tab: page.viewMode === "tab" && strumTab.visible
+                                        readonly property real contentW: diag ? diagram.implicitWidth : tab ? strumTab.implicitWidth : 0
+                                        readonly property real contentH: diag ? diagram.implicitHeight : tab ? strumTab.implicitHeight : 0
+                                        width: Math.max(64, contentW + 16, chordText.implicitWidth + 24)
+                                        height: contentH > 0 ? chordText.implicitHeight + contentH + 24 : 44
                                         radius: Theme.radiusSmall
                                         color: Qt.rgba(Theme.chord.r, Theme.chord.g, Theme.chord.b, Theme.dark ? 0.16 : 0.09)
                                         Text {
                                             id: chordText
                                             anchors.horizontalCenter: parent.horizontalCenter
-                                            y: page.showDiagrams && diagram.visible ? 8 : (parent.height - height) / 2
+                                            y: chordBox.contentH > 0 ? 8 : (parent.height - height) / 2
                                             text: page.t(chordBox.modelData)
                                             color: Theme.chord
                                             font.family: Theme.monoFamily
@@ -220,11 +233,22 @@ Rectangle {
                                         }
                                         ChordDiagram {
                                             id: diagram
-                                            visible: page.showDiagrams && shape !== null
+                                            visible: page.viewMode === "diagram" && shape !== null
                                             chord: chordBox.modelData
                                             semitones: page.semitones
                                             anchors.horizontalCenter: parent.horizontalCenter
                                             anchors.horizontalCenterOffset: -4
+                                            anchors.top: chordText.bottom
+                                            anchors.topMargin: 6
+                                        }
+                                        StrumTab {
+                                            id: strumTab
+                                            visible: page.viewMode === "tab" && shape !== null
+                                            chord: chordBox.modelData
+                                            semitones: page.semitones
+                                            pattern: page.song && page.song.strum ? page.song.strum.pattern : ["D"]
+                                            counts: page.song && page.song.strum ? page.song.strum.counts : []
+                                            anchors.horizontalCenter: parent.horizontalCenter
                                             anchors.top: chordText.bottom
                                             anchors.topMargin: 6
                                         }

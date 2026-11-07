@@ -9,6 +9,7 @@ fn main() {
         "qml/StudyPage.qml",
         "qml/SettingsPage.qml",
         "qml/SongPage.qml",
+        "qml/StrumTab.qml",
         "qml/AppButton.qml",
         "qml/Card.qml",
         "qml/ChordDiagram.qml",

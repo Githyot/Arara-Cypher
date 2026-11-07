@@ -12,9 +12,10 @@ QtObject {
             key: "C#",
             video: "https://www.youtube.com/watch?v=GZgcJF1Ef0A",
             source: "Aula do canal Cifra Music (François Marçal)",
+            // Códigos da batida: veja StrumTab.qml.
             strum: {
-                name: "Sugestão de batida (pop rock)",
-                pattern: ["↓", "", "↓", "↑", "", "↑", "↓", "↑"],
+                name: "Batida: baixo, acorde e abafado (sugestão)",
+                pattern: ["B", "", "d", "", "B", "", "", "X"],
                 counts: ["1", "e", "2", "e", "3", "e", "4", "e"]
             },
             sections: [

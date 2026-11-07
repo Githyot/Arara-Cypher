@@ -27,6 +27,29 @@ QtObject {
                 { name: "Parte B", repeat: 1, chords: ["C#5", "G#5", "F5", "Bb5", "G#5"] },
                 { name: "Final", repeat: 1, chords: ["Fm7", "C#5", "Bb9(7)", "F#5(9)", "Fm7", "C#5", "Bb9(7)"] }
             ]
+        },
+        {
+            title: "Yukon",
+            artist: "Justin Bieber",
+            key: "F#m",
+            capo: 1,
+            video: "https://www.youtube.com/shorts/j3ASgHUkAqM",
+            source: "Short do canal Tizo Guitar · acordes conferidos no Guitar Tabs Explorer",
+            strum: {
+                name: "Batida: R&B suave (sugestão)",
+                pattern: ["B", "", "d", "U", "", "U", "d", "U"],
+                counts: ["1", "e", "2", "e", "3", "e", "4", "e"]
+            },
+            sections: [
+                { name: "Intro", repeat: 1, chords: ["Bm", "C#m", "F#m"] },
+                { name: "Verso", repeat: 1, chords: ["Bm", "C#m", "F#m", "Bm", "C#m", "F#m", "Bm"] },
+                { name: "Pré-refrão", repeat: 1, chords: ["C#m", "F#m", "Bm", "C#m", "F#m", "Bm", "C#m", "F#m"] },
+                { name: "Refrão", repeat: 2, chords: ["Bm", "C#m", "F#m"] },
+                { name: "Verso 2", repeat: 2, chords: ["Bm", "C#m", "F#m"] },
+                { name: "Pré-refrão", repeat: 1, chords: ["C#m", "F#m", "Bm", "C#m", "F#m", "Bm", "C#m", "F#m"] },
+                { name: "Refrão", repeat: 2, chords: ["Bm", "C#m", "F#m"] },
+                { name: "Final", repeat: 1, chords: ["Bm", "C#m", "F#m"] }
+            ]
         }
     ]
 }

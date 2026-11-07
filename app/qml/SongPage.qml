@@ -78,6 +78,16 @@ Rectangle {
                                 font.pixelSize: 26
                                 font.weight: Font.Bold
                             }
+                            Text {
+                                visible: !!(page.song && page.song.capo)
+                                text: page.song && page.song.capo
+                                      ? "Capotraste na " + page.song.capo + "ª casa (soa em "
+                                        + Music.transposeChord(page.t(page.song.key), page.song.capo) + ")"
+                                      : ""
+                                color: Theme.text
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSize - 1
+                            }
                         }
                         AppButton { iconName: "remove"; onClicked: page.semitones-- }
                         Text {

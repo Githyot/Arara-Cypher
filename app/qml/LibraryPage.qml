@@ -78,6 +78,7 @@ Rectangle {
                                 Text {
                                     width: parent.width
                                     text: songCard.modelData.artist + " · Tom " + songCard.modelData.key
+                                      + (songCard.modelData.capo ? " · Capo " + songCard.modelData.capo + "ª" : "")
                                     color: Theme.textDim
                                     elide: Text.ElideRight
                                     font.family: Theme.fontFamily

@@ -18,6 +18,7 @@ fn main() {
         "qml/AppTextField.qml",
         "qml/BigChordDiagram.qml",
         "qml/Card.qml",
+        "qml/Collapsible.qml",
         "qml/FretInput.qml",
         "qml/ChordDiagram.qml",
         "qml/HeaderBar.qml",

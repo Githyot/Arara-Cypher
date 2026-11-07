@@ -63,6 +63,35 @@ Rectangle {
     signal back()
     signal edit()
 
+    signal setAll(bool open)
+
+    // "D · D U · U D U" -> setas para o resumo das batidas.
+    function arrows(pattern) {
+        return pattern.map(function (p) {
+            return p === "" ? "·" : p === "U" ? "↑" : p === "X" ? "×" : "↓"
+        }).join(" ")
+    }
+    function chordList(sec) {
+        var names = sec.chords.map(function (c) { return t(Examples.chordName(c)) })
+        var s = names.join("  ")
+        if (sec.tab) s += (s ? "  · " : "") + "tab"
+        if (!s && sec.note) s = sec.note
+        return s
+    }
+    // Nome de uma parte anterior com os mesmos acordes e a mesma tab, ou "".
+    function sameAs(i) {
+        if (!song) return ""
+        var a = song.sections[i]
+        if (a.chords.length === 0 && !a.tab) return ""
+        for (var j = 0; j < i; ++j) {
+            var b = song.sections[j]
+            if (b.chords.join(" ") === a.chords.join(" ") && (b.tab || "") === (a.tab || "")
+                    && (b.strum || 0) === (a.strum || 0))
+                return b.name
+        }
+        return ""
+    }
+
     color: Theme.window
 
     function t(chord) { return Music.transposeChord(chord, semitones) }
@@ -78,6 +107,12 @@ Rectangle {
                 text: page.song && page.song.id ? "Editar" : "Editar uma cópia"
                 flat: true
                 onClicked: page.edit()
+            }
+            AppButton {
+                visible: !!(page.song && page.song.video)
+                text: "Vídeo"
+                flat: true
+                onClicked: Qt.openUrlExternally(page.song.video)
             }
             AppButton { text: "Voltar"; flat: true; onClicked: page.back() }
         }
@@ -97,26 +132,7 @@ Rectangle {
                 x: (parent.width - width) / 2
                 spacing: 14
 
-                // ---- Cabeçalho da música ----
-                Column {
-                    width: parent.width
-                    spacing: 2
-                    Text {
-                        text: page.song ? (page.song.artist || "") : ""
-                        color: Theme.textDim
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize + 2
-                    }
-                    Text {
-                        visible: !!(page.song && page.song.source)
-                        text: page.song ? page.song.source : ""
-                        color: Theme.textDim
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize - 2
-                    }
-                }
-
-                // ---- Tom e transposição ----
+                // ---- Cabeçalho, tom e como ver ----
                 Card {
                     width: parent.width
                     RowLayout {
@@ -124,33 +140,36 @@ Rectangle {
                         spacing: 8
                         Column {
                             Layout.fillWidth: true
+                            spacing: 2
+                            Row {
+                                spacing: 8
+                                Text {
+                                    text: page.song ? page.t(page.song.key) : ""
+                                    color: Theme.chord
+                                    font.family: Theme.monoFamily
+                                    font.pixelSize: 24
+                                    font.weight: Font.Bold
+                                }
+                                Text {
+                                    anchors.baseline: parent.children[0].baseline
+                                    text: page.song && page.song.capo ? "capo " + page.song.capo + "ª casa" : ""
+                                    color: Theme.textDim
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSize - 1
+                                }
+                            }
                             Text {
-                                text: "Tom"
+                                width: parent.width
+                                elide: Text.ElideRight
+                                text: page.song ? [page.song.artist, page.song.source].filter(function (s) { return !!s }).join(" · ") : ""
                                 color: Theme.textDim
                                 font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize - 1
-                            }
-                            Text {
-                                text: page.song ? page.t(page.song.key) : ""
-                                color: Theme.chord
-                                font.family: Theme.monoFamily
-                                font.pixelSize: 26
-                                font.weight: Font.Bold
-                            }
-                            Text {
-                                visible: !!(page.song && page.song.capo)
-                                text: page.song && page.song.capo
-                                      ? "Capotraste na " + page.song.capo + "ª casa (soa em "
-                                        + Music.transposeChord(page.t(page.song.key), page.song.capo) + ")"
-                                      : ""
-                                color: Theme.text
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize - 1
+                                font.pixelSize: Theme.fontSize - 2
                             }
                         }
                         AppButton { iconName: "remove"; onClicked: page.semitones-- }
                         Text {
-                            Layout.preferredWidth: 44
+                            Layout.preferredWidth: 32
                             horizontalAlignment: Text.AlignHCenter
                             text: (page.semitones > 0 ? "+" : "") + page.semitones
                             color: Theme.text
@@ -165,16 +184,9 @@ Rectangle {
                             onClicked: page.semitones = 0
                         }
                     }
-                    Rectangle { width: parent.width; height: 1; color: Theme.border; opacity: 0.6 }
-                    RowLayout {
+                    Flow {
                         width: parent.width
-                        Text {
-                            Layout.fillWidth: true
-                            text: "Ver acordes como"
-                            color: Theme.text
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSize
-                        }
+                        spacing: 8
                         SegmentedControl {
                             model: [{ value: "names", label: "Nomes" },
                                     { value: "diagram", label: "Braço" },
@@ -184,16 +196,6 @@ Rectangle {
                             current: page.viewMode
                             onActivated: (v) => page.viewMode = v
                         }
-                    }
-                    RowLayout {
-                        width: parent.width
-                        Text {
-                            Layout.fillWidth: true
-                            text: "Tamanho"
-                            color: Theme.text
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSize
-                        }
                         SegmentedControl {
                             model: [{ value: "0.8", label: "P" },
                                     { value: "1", label: "M" },
@@ -202,84 +204,78 @@ Rectangle {
                             current: String(Theme.chordZoom)
                             onActivated: (v) => Theme.chordZoom = Number(v)
                         }
-                    }
-                    RowLayout {
-                        visible: page.viewMode === "score"
-                        width: parent.width
-                        Text {
-                            Layout.fillWidth: true
-                            text: "Partitura"
-                            color: Theme.text
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSize
-                        }
                         SegmentedControl {
+                            visible: page.viewMode === "score"
                             model: [{ value: "chord", label: "Por acorde" },
                                     { value: "full", label: "Música inteira" }]
                             current: page.fullScore ? "full" : "chord"
                             onActivated: (v) => page.fullScore = (v === "full")
                         }
                     }
-                    AppButton {
-                        visible: !!(page.song && page.song.video)
-                        text: "Assistir à aula no YouTube"
-                        suggested: true
-                        onClicked: Qt.openUrlExternally(page.song.video)
-                    }
                 }
 
-                // ---- Batidas ----
-                Repeater {
-                    model: page.usedStrums
-                    Column {
-                        id: strumBlock
-                        required property var modelData
-                        width: content.width
-                        spacing: 6
-                        SectionTitle { text: strumBlock.modelData.name }
-                        Card {
-                            width: parent.width
-                            Row {
-                                spacing: 2
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                Repeater {
-                                    model: strumBlock.modelData.pattern
-                                    Column {
-                                        id: beat
-                                        required property string modelData
-                                        required property int index
-                                        width: 44
-                                        spacing: 2
-                                        Text {
-                                            width: parent.width
-                                            horizontalAlignment: Text.AlignHCenter
-                                            text: beat.modelData === "" ? "·" : beat.modelData === "U" ? "↑" : "↓"
-                                            color: beat.modelData === "" ? Theme.textDim
-                                                 : beat.modelData === "X" ? Theme.textDim : Theme.accent
-                                            font.pixelSize: 26
-                                            font.weight: Font.Bold
-                                        }
-                                        Text {
-                                            width: parent.width
-                                            horizontalAlignment: Text.AlignHCenter
-                                            text: ({ "B": "baixo", "D": "tudo", "d": "acorde", "U": "agudas", "X": "abafa" })[beat.modelData] || " "
-                                            color: Theme.text
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: 10
-                                        }
-                                        Text {
-                                            width: parent.width
-                                            horizontalAlignment: Text.AlignHCenter
-                                            text: strumBlock.modelData.counts[beat.index] || ""
-                                            color: Theme.textDim
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: Theme.fontSize - 2
+                // ---- Batidas (fechadas: só as setas) ----
+                Collapsible {
+                    id: strumsGroup
+                    visible: page.usedStrums.length > 0
+                    width: parent.width
+                    title: page.usedStrums.length > 1 ? "Batidas" : "Batida"
+                    expanded: false
+                    summary: page.usedStrums.map(function (s) { return page.arrows(s.pattern) }).join("   |   ")
+
+                    Repeater {
+                        model: page.usedStrums
+                        Column {
+                            id: strumBlock
+                            required property var modelData
+                            width: strumsGroup.width
+                            spacing: 6
+                            Text { visible: page.usedStrums.length > 1; text: strumBlock.modelData.name; color: Theme.textDim; font.family: Theme.fontFamily; font.pixelSize: Theme.fontSize - 1 }
+                            Card {
+                                width: parent.width
+                                Row {
+                                    spacing: 2
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    Repeater {
+                                        model: strumBlock.modelData.pattern
+                                        Column {
+                                            id: beat
+                                            required property string modelData
+                                            required property int index
+                                            width: 44
+                                            spacing: 2
+                                            Text {
+                                                width: parent.width
+                                                horizontalAlignment: Text.AlignHCenter
+                                                text: beat.modelData === "" ? "·" : beat.modelData === "U" ? "↑" : "↓"
+                                                color: beat.modelData === "" ? Theme.textDim
+                                                     : beat.modelData === "X" ? Theme.textDim : Theme.accent
+                                                font.pixelSize: 26
+                                                font.weight: Font.Bold
+                                            }
+                                            Text {
+                                                width: parent.width
+                                                horizontalAlignment: Text.AlignHCenter
+                                                text: ({ "B": "baixo", "D": "tudo", "d": "acorde", "U": "agudas", "X": "abafa" })[beat.modelData] || " "
+                                                color: Theme.text
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: 10
+                                            }
+                                            Text {
+                                                width: parent.width
+                                                horizontalAlignment: Text.AlignHCenter
+                                                text: strumBlock.modelData.counts[beat.index] || ""
+                                                color: Theme.textDim
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontSize - 2
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
                     }
+
                 }
 
                 // ---- Partitura da música inteira ----
@@ -323,36 +319,37 @@ Rectangle {
                     }
                 }
 
+
                 // ---- Seções ----
+                RowLayout {
+                    visible: !page.showFullScore && !!page.song && page.song.sections.length > 1
+                    width: parent.width
+                    Text {
+                        Layout.fillWidth: true
+                        text: "Partes"
+                        color: Theme.textDim
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSize - 1
+                    }
+                    AppButton { text: "Abrir todas"; flat: true; onClicked: page.setAll(true) }
+                    AppButton { text: "Fechar todas"; flat: true; onClicked: page.setAll(false) }
+                }
                 Repeater {
                     model: page.song && !page.showFullScore ? page.song.sections : []
-                    Column {
+                    Collapsible {
                         id: section
                         required property var modelData
+                        required property int index
                         readonly property var strum: Examples.strumOf(page.song, modelData)
+                        readonly property string sameAs: page.sameAs(index)
                         width: content.width
-                        spacing: 6
-
-                        Row {
-                            spacing: 8
-                            SectionTitle { text: section.modelData.name }
-                            Rectangle {
-                                visible: section.modelData.repeat > 1
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: repeatText.implicitWidth + 12
-                                height: repeatText.implicitHeight + 4
-                                radius: height / 2
-                                color: Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.15)
-                                Text {
-                                    id: repeatText
-                                    anchors.centerIn: parent
-                                    text: section.modelData.repeat + "×"
-                                    color: Theme.accent
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSize - 2
-                                    font.weight: Font.Bold
-                                }
-                            }
+                        title: modelData.name
+                        badge: modelData.repeat > 1 ? modelData.repeat + "×" : ""
+                        summary: (sameAs ? "igual a " + sameAs + " · " : "") + page.chordList(modelData)
+                        expanded: sameAs === ""
+                        Connections {
+                            target: page
+                            function onSetAll(open) { section.expanded = open }
                         }
 
                         Card {
@@ -477,6 +474,7 @@ Rectangle {
                 }
 
                 Text {
+                    visible: !!page.song && !page.song.id
                     width: parent.width
                     wrapMode: Text.WordWrap
                     text: "A letra não está incluída porque tem direitos autorais. Acompanhe pelo vídeo."

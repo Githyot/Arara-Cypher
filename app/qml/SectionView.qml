@@ -73,6 +73,33 @@ Flow {
         return own && own.length === base.length && section.cells && section.cells[i] ? section.cells[i] : ({})
     }
 
+    // Tab (pauta + TAB) da batida tocada num acorde: cada tempo vira um
+    // toque com as cordas que soam e a seta embaixo. Usa as casas escritas
+    // à mão no compasso (cells) por cima da forma.
+    function strumTabText(i, token) {
+        var shape = Examples.shape(Examples.chordName(token), semitones, song ? Examples.voicing(song, token) : null) || Examples.blankShape()
+        var pat = patternOf(i), cells = cellsOf(i)
+        var events = []
+        for (var k = 0; k < pat.length; ++k) {
+            var code = pat[k]
+            if (!code) continue
+            var strings = Examples.isPick(code)
+                ? Examples.pickStrings(code).filter(function (st) { return shape.frets[st] >= 0 || cells[k + ":" + st] })
+                : Examples.strokeStrings(shape, code)
+            var notes = []
+            for (var j = 0; j < strings.length; ++j) {
+                var st = strings[j], c = cells[k + ":" + st]
+                var f = c && c.f !== undefined ? c.f : shape.frets[st]
+                if (Examples.isMute(code)) f = 255
+                if (f < 0) continue
+                notes.push({ string: st, fret: f })
+            }
+            if (notes.length) events.push({ notes: notes, arrow: Examples.strokeUp(code) ? "U" : "D" })
+        }
+        if (!events.length) return ""
+        return Music.renderTab(JSON.stringify([{ chords: [], events: events, bars: [] }]))
+    }
+
     // ---- Com tab: pedaços ----
     Repeater {
         model: root.segments
@@ -153,7 +180,7 @@ Flow {
             readonly property string name: Examples.chordName(modelData)
             readonly property var voicing: root.rev, root.song ? Examples.voicing(root.song, modelData) : null
             property bool open: false
-            width: Math.max(big.implicitWidth * root.zoom, notation.width, strumTab.implicitWidth * root.zoom, label.implicitWidth, open ? boxEditor.implicitWidth : 0) + 24
+            width: Math.max(big.implicitWidth * root.zoom, beatScore.width, label.implicitWidth, open ? boxEditor.implicitWidth : 0) + 24
             height: inner.implicitHeight + 16
             radius: Theme.radiusSmall
             color: Qt.rgba(Theme.chord.r, Theme.chord.g, Theme.chord.b, Theme.dark ? 0.12 : 0.07)
@@ -199,34 +226,16 @@ Flow {
                     rev: root.rev
                     onChanged: root.edited()
                 }
-                NotationView {
-                    id: notation
-                    visible: big.shape !== null
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    zoom: root.zoom
-                    width: implicitWidth
+                // A batida no estilo da tab: pauta + TAB com as setas.
+                TabScore {
+                    id: beatScore
+                    readonly property string text: root.rev, root.strumTabText(box.index, box.modelData)
+                    width: Math.min(root.width - 16, (48 + root.patternOf(box.index).length * 24 + 20) * root.zoom)
                     height: implicitHeight
-                    chord: box.name
-                    voicing: box.voicing
-                    semitones: root.semitones
-                    pattern: root.rev, root.patternOf(box.index)
-                }
-                Item {
-                    width: parent.width
-                    height: strumTab.implicitHeight * root.zoom
-                    StrumTab {
-                        id: strumTab
-                        scale: root.zoom
-                        transformOrigin: Item.Top
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        chord: box.name
-                        voicing: box.voicing
-                        semitones: root.semitones
-                        rev: root.rev
-                        pattern: root.rev, root.patternOf(box.index).slice()
-                        cells: root.rev, JSON.parse(JSON.stringify(root.cellsOf(box.index)))
-                        counts: root.strum ? root.strum.counts : []
-                    }
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    tab: text
+                    keyName: root.keyName
+                    zoom: root.zoom
                 }
             }
         }

@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Controls.Basic
 import AraraCypher
 
 // Editor visual da tab de uma parte. Mostra todos os toques (cada coluna da
@@ -267,8 +268,10 @@ Column {
     Flickable {
         id: flick
         width: parent.width
-        height: Math.max(root.sysH, strip.height)
+        height: Math.max(root.sysH, strip.height) + (contentWidth > width ? 16 : 0)
         contentWidth: strip.width
+        // Barra de rolagem horizontal quando os toques passam da largura.
+        ScrollBar.horizontal: AppScrollBar {}
         flickableDirection: Flickable.HorizontalFlick
         boundsBehavior: Flickable.StopAtBounds
         interactive: !drag.active

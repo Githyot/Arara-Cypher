@@ -9,13 +9,13 @@ ScrollBar {
     policy: size < 1 ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff
     minimumSize: 0.06
     padding: 2
+    readonly property real thick: bar.hovered || bar.pressed ? 10 : 6
     contentItem: Rectangle {
-        implicitWidth: bar.hovered || bar.pressed ? 10 : 6
-        implicitHeight: 40
-        radius: width / 2
+        implicitWidth: bar.orientation === Qt.Horizontal ? 40 : bar.thick
+        implicitHeight: bar.orientation === Qt.Horizontal ? bar.thick : 40
         color: Theme.text
         opacity: bar.pressed ? 0.55 : bar.hovered ? 0.42 : 0.28
-        Behavior on implicitWidth { NumberAnimation { duration: 120 } }
+        radius: Math.min(width, height) / 2
     }
-    background: Item { implicitWidth: 14 }
+    background: Item { implicitWidth: 14; implicitHeight: 14 }
 }

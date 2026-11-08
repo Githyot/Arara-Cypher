@@ -23,7 +23,7 @@ Flickable {
     }
 
     readonly property string rich: {
-        var lines = tab.split("\n")
+        var lines = Music.alignArrows(tab).split("\n")
         var out = []
         for (var i = 0; i < lines.length; ++i) {
             var line = lines[i]

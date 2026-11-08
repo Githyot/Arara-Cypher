@@ -9,6 +9,10 @@ Column {
     property int frets: 15
     property bool together: false
     property var pending: []           // [{ string, fret }] no modo "notas juntas"
+    // Com marks (lista de { string, fret }), o braço mostra essas notas e o
+    // toque numa casa só avisa com picked() (o editor visual decide o que fazer).
+    property var marks: null
+    signal picked(int string, int fret)
     signal column(var notes)           // notas de uma coluna da tab
     signal bar()
     signal rest()
@@ -21,12 +25,18 @@ Column {
     readonly property var names: ["E", "A", "D", "G", "B", "e"]
 
     function isPending(s, f) {
+        if (marks) {
+            for (var j = 0; j < marks.length; ++j)
+                if (marks[j].string === s && marks[j].fret === f) return true
+            return false
+        }
         for (var i = 0; i < pending.length; ++i)
             if (pending[i].string === s && pending[i].fret === f) return true
         return false
     }
 
     function tap(s, f) {
+        if (marks) { picked(s, f); return }
         if (!together) {
             column([{ string: s, fret: f }])
             return
@@ -113,7 +123,7 @@ Column {
                         Rectangle {
                             id: spot
                             required property int index
-                            readonly property bool marked: root.pending.length >= 0 && root.isPending(stringRow.s, index)
+                            readonly property bool marked: (root.marks || root.pending).length >= 0 && root.isPending(stringRow.s, index)
                             x: 34 + index * root.cellW + (root.cellW - width) / 2
                             anchors.verticalCenter: parent.verticalCenter
                             width: 24
@@ -147,6 +157,7 @@ Column {
     }
 
     Flow {
+        visible: !root.marks
         width: parent.width
         spacing: 6
         AppButton {

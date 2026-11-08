@@ -39,6 +39,18 @@ pub mod qobject {
         #[qinvokable]
         #[cxx_name = "lessonTab"]
         fn lesson_tab(&self, text: &QString) -> QString;
+        #[qinvokable]
+        #[cxx_name = "tabModel"]
+        fn tab_model(&self, text: &QString) -> QString;
+        #[qinvokable]
+        #[cxx_name = "renderTab"]
+        fn render_tab(&self, json: &QString) -> QString;
+        #[qinvokable]
+        #[cxx_name = "alignArrows"]
+        fn align_arrows(&self, text: &QString) -> QString;
+        #[qinvokable]
+        #[cxx_name = "setArrow"]
+        fn set_arrow(&self, text: &QString, system: i32, event: i32, arrow: &QString) -> QString;
 
         /// Arquivo WAV do "tic" do metrônomo (forte no primeiro tempo), como URL.
         #[qinvokable]
@@ -146,6 +158,26 @@ impl qobject::Music {
 
     pub fn parse_tab(&self, text: &QString) -> QString {
         QString::from(tab::parse_json(&text.to_string()).as_str())
+    }
+
+    pub fn tab_model(&self, text: &QString) -> QString {
+        QString::from(tab::edit_model_json(&text.to_string()).as_str())
+    }
+
+    pub fn render_tab(&self, json: &QString) -> QString {
+        QString::from(tab::render_json(&json.to_string()).as_str())
+    }
+
+    pub fn align_arrows(&self, text: &QString) -> QString {
+        QString::from(tab::align_arrows(&text.to_string()).as_str())
+    }
+
+    pub fn set_arrow(&self, text: &QString, system: i32, event: i32, arrow: &QString) -> QString {
+        let t = text.to_string();
+        if system < 0 || event < 0 {
+            return QString::from(t.as_str());
+        }
+        QString::from(tab::set_arrow(&t, system as usize, event as usize, &arrow.to_string()).as_str())
     }
 
     pub fn lesson_tab(&self, text: &QString) -> QString {

@@ -30,7 +30,7 @@ Rectangle {
     }
 
     function blank() {
-        return { title: "", artist: "", key: "C", capo: 0, video: "",
+        return { title: "", artist: "", key: "C", capo: 0, video: "", fretsReal: true,
                  strums: [defaultStrum()], voicings: {},
                  sections: [{ name: "Intro", repeat: 1, chords: [] }] }
     }
@@ -44,7 +44,11 @@ Rectangle {
         if (d.capo === undefined) d.capo = 0
         if (d.video === undefined) d.video = ""
         // Partes abertas só quando são poucas; com muitas, abre uma por vez.
-        for (var i = 0; i < d.sections.length; ++i) d.sections[i]._open = d.sections.length <= 2
+        for (var i = 0; i < d.sections.length; ++i) {
+            d.sections[i]._open = d.sections.length <= 2
+            // Setas da tab embaixo do toque certo (1ª seta = 1º toque).
+            if (d.sections[i].tab) d.sections[i].tab = Music.alignArrows(d.sections[i].tab)
+        }
         draft = d
         pasteFold.expanded = !song
         editingChord = ""
@@ -55,45 +59,6 @@ Rectangle {
     }
 
     function bump() { rev++ }
-
-    // ---- Tab digitada no braço ----
-    // Usa o último bloco de 6 linhas da tab (ou cria um) e acrescenta colunas.
-    function tabBlock(text) {
-        var lines = text.length > 0 ? text.split("\n") : []
-        while (lines.length > 0 && lines[lines.length - 1].trim() === "") lines.pop()
-        var labels = ["e", "B", "G", "D", "A", "E"]
-        var n = lines.length
-        var ok = n >= 6
-        for (var i = 0; ok && i < 6; ++i)
-            if (!/^\s*[EADGBe]\s*\|/.test(lines[n - 6 + i])) ok = false
-        if (!ok) {
-            if (n > 0) lines.push("")
-            for (var j = 0; j < 6; ++j) lines.push(labels[j] + "|-")
-            n = lines.length
-        }
-        return { head: lines.slice(0, n - 6), block: lines.slice(n - 6) }
-    }
-    function tabJoin(t) { return t.head.concat(t.block).join("\n") }
-    function tabAppend(text, notes) {
-        var t = tabBlock(text)
-        var w = 1
-        for (var k = 0; k < notes.length; ++k) w = Math.max(w, String(notes[k].fret).length)
-        for (var i = 0; i < 6; ++i) {
-            var s = 5 - i
-            var line = t.block[i].replace(/\|\s*$/, "")
-            if (line.length === 1 || /\|$/.test(line)) line += "-"
-            var token = "-".repeat(w)
-            for (var m = 0; m < notes.length; ++m)
-                if (notes[m].string === s) token = (String(notes[m].fret) + "-".repeat(w)).substring(0, w)
-            t.block[i] = line + token + "-"
-        }
-        return tabJoin(t)
-    }
-    function tabBar(text) {
-        var t = tabBlock(text)
-        for (var i = 0; i < 6; ++i) t.block[i] = t.block[i].replace(/\|\s*$/, "") + "|-"
-        return tabJoin(t)
-    }
 
     function chordsOf(text) {
         return text.split(/\s+/).filter(function (t) { return t.length > 0 })
@@ -131,6 +96,8 @@ Rectangle {
         if (take("artist")) draft.artist = song.artist
         if (song.key && replace) draft.key = song.key
         if (song.capo && replace) draft.capo = song.capo
+        // O importador já põe as formas na casa de verdade (contando o capo).
+        if (replace || !draft.voicings || Object.keys(draft.voicings).length === 0) draft.fretsReal = true
         if (song.bpm && (replace || !draft.bpm)) draft.bpm = song.bpm
         var parts = song.sections
         if (song.strums && song.strums.length > 0) {
@@ -411,6 +378,43 @@ Rectangle {
                     }
                 }
 
+                // Cifras importadas antes da correção do capotraste guardaram as
+                // formas contando a partir do capo; um toque soma o capo nelas.
+                Card {
+                    visible: page.rev, !!page.draft && (page.draft.capo || 0) > 0 && !page.draft.fretsReal
+                             && Object.keys(page.draft.voicings || {}).length > 0
+                    width: parent.width
+                    Text {
+                        width: parent.width
+                        wrapMode: Text.WordWrap
+                        text: page.rev, page.draft ? "As formas desta cifra podem estar contando a partir do capotraste (ex.: 10 em vez de " + (10 + (page.draft.capo || 0)) + "). Isso acontecia nas cifras importadas antes desta versão." : ""
+                        color: Theme.text
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSize
+                    }
+                    Row {
+                        spacing: 8
+                        AppButton {
+                            suggested: true
+                            text: page.rev, page.draft ? "Corrigir as casas (+" + (page.draft.capo || 0) + ")" : ""
+                            onClicked: {
+                                for (var k in page.draft.voicings) {
+                                    var v = page.draft.voicings[k]
+                                    for (var i = 0; i < 6; ++i) if (v.frets[i] > 0) v.frets[i] += page.draft.capo
+                                }
+                                page.draft.fretsReal = true
+                                page.message = "Casas corrigidas. Toque em Salvar."
+                                page.bump()
+                            }
+                        }
+                        AppButton {
+                            flat: true
+                            text: "Estão certas"
+                            onClicked: { page.draft.fretsReal = true; page.bump() }
+                        }
+                    }
+                }
+
                 // ---- Colar cifra ----
                 Collapsible {
                     width: parent.width
@@ -625,8 +629,8 @@ Rectangle {
                                 readonly property var modelData: partRow.modelData
                                 readonly property int index: partRow.index
                                 property bool showTab: !!modelData.tab
-                                property bool showBoard: false
-                                property var history: []
+                                property bool showBoard: true
+                                property bool showColor: false
                                 x: handle.width + 6
                             width: parent.width - x
                                 padding: partFold.expanded ? 14 : 4
@@ -752,6 +756,23 @@ Rectangle {
                                         }
                                     }
 
+                                    AppButton {
+                                        visible: secCard.modelData.chords.length > 0
+                                        text: secCard.showColor ? "Esconder a tab colorida" : "Editar a tab colorida (casa, dedo, setas)"
+                                        onClicked: secCard.showColor = !secCard.showColor
+                                    }
+                                    ChordTab {
+                                        visible: secCard.showColor && secCard.modelData.chords.length > 0
+                                        width: parent.width
+                                        chords: visible ? secCard.modelData.chords : []
+                                        song: page.draft
+                                        strum: partStrum.strum
+                                        zoom: 0.9
+                                        rev: page.rev
+                                        editing: true
+                                        onEdited: page.bump()
+                                    }
+
                                     AppTextArea {
                                         visible: secCard.showTab
                                         width: parent.width
@@ -762,22 +783,34 @@ Rectangle {
                                         id: tabArea
                                     }
     
+                                    // Setas x toques: a 1ª seta é do 1º toque, e assim por diante.
+                                    Text {
+                                        readonly property var bad: {
+                                            if (!secCard.showTab || !tabArea.text) return []
+                                            var out = [], sys = JSON.parse(Music.lessonTab(tabArea.text))
+                                            for (var i = 0; i < sys.length; ++i)
+                                                if (sys[i].arrows > 0 && sys[i].arrows !== sys[i].events.length)
+                                                    out.push("bloco " + (i + 1) + ": " + sys[i].events.length + " toques e " + sys[i].arrows + " setas")
+                                            return out
+                                        }
+                                        visible: bad.length > 0
+                                        width: parent.width
+                                        wrapMode: Text.WordWrap
+                                        text: "As setas não batem com os toques (" + bad.join("; ") + "). Cada toque precisa de uma seta; o app liga as que dá pela posição."
+                                        color: Theme.destructive
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSize - 1
+                                    }
                                     AppButton {
                                         visible: secCard.showTab
-                                        text: secCard.showBoard ? "Esconder o braço" : "Digitar no braço"
+                                        text: secCard.showBoard ? "Esconder o editor visual" : "Editor visual (braço e toques)"
                                         onClicked: secCard.showBoard = !secCard.showBoard
                                     }
-                                    FretInput {
+                                    TabEditor {
                                         visible: secCard.showTab && secCard.showBoard
                                         width: parent.width
-                                        function push(t) {
-                                            secCard.history.push(tabArea.text)
-                                            tabArea.text = t
-                                        }
-                                        onColumn: (notes) => push(page.tabAppend(tabArea.text, notes))
-                                        onRest: push(page.tabAppend(tabArea.text, []))
-                                        onBar: push(page.tabBar(tabArea.text))
-                                        onUndo: if (secCard.history.length > 0) tabArea.text = secCard.history.pop()
+                                        text: visible ? tabArea.text : ""
+                                        onEdited: (t) => { tabArea.text = t }
                                     }
     
                                     AppTextField {

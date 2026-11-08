@@ -13,6 +13,8 @@ Canvas {
     property real zoom: 1
     property int startNumber: 0        // número do compasso (0 = não mostra)
     property string label: ""          // nome da parte, em cima da primeira linha
+    property bool editing: false       // tocar embaixo da nota põe/troca a seta
+    signal arrowClicked(int system, int event, string arrow)
 
     // Eventos em ordem (notas e barras), com a seta da batida de cada nota
     // quando a tab traz a linha de setas embaixo.
@@ -29,7 +31,7 @@ Canvas {
                     if (out.length && !out[out.length - 1].bar) out.push({ bar: true })
                     bi++
                 }
-                out.push({ notes: sys.events[e].notes, arrow: sys.events[e].arrow || "" })
+                out.push({ notes: sys.events[e].notes, arrow: sys.events[e].arrow || "", s: s, e: e })
             }
         }
         while (out.length && out[out.length - 1].bar) out.pop()
@@ -59,7 +61,7 @@ Canvas {
     readonly property real headroom: Math.max(18, (maxStep - 38) * gap / 2 + gap * 3.5 + 8)
     readonly property real topPad: (label.length > 0 ? 14 : 0) + headroom
     readonly property real staffH: gap * 4
-    readonly property real rowH: topPad + staffH + gap * 6 + tabGap * 5 + 22 + (hasArrows ? 20 : 0)
+    readonly property real rowH: topPad + staffH + gap * 6 + tabGap * 5 + 22 + (hasArrows || editing ? 20 : 0)
 
     // Divide os eventos em linhas que cabem na largura.
     readonly property var rows: {
@@ -83,6 +85,7 @@ Canvas {
 
     onRowsChanged: requestPaint()
     onZoomChanged: requestPaint()
+    onEditingChanged: requestPaint()
     onKeyNameChanged: requestPaint()
     Connections {
         target: Theme
@@ -212,6 +215,16 @@ Canvas {
                     }
                 }
                 // Direção da palhetada embaixo da tab.
+                if (editing) {
+                    ctx.strokeStyle = Qt.rgba(accent.r, accent.g, accent.b, 0.45)
+                    ctx.lineWidth = 1
+                    ctx.strokeRect(cx - slotW / 2 + 2.5, tabBottom + 6.5, slotW - 5, 21)
+                    if (!ev.arrow) {
+                        ctx.fillStyle = dim
+                        ctx.font = "bold 13px sans-serif"
+                        ctx.fillText("·", cx - ctx.measureText("·").width / 2, tabBottom + 21)
+                    }
+                }
                 if (ev.arrow) {
                     ctx.fillStyle = accent
                     ctx.font = "bold 15px sans-serif"
@@ -280,6 +293,29 @@ Canvas {
                     }
                     p += 1
                 }
+            }
+        }
+    }
+
+    // Modo de edição: o toque embaixo de uma nota troca a seta (nada → ↓ → ↑ → nada).
+    MouseArea {
+        anchors.fill: parent
+        enabled: root.editing
+        cursorShape: Qt.PointingHandCursor
+        onClicked: (m) => {
+            var lx = m.x / root.zoom, ly = m.y / root.zoom
+            var r = Math.floor(ly / root.rowH)
+            if (r < 0 || r >= root.rows.length) return
+            var x = root.clefW
+            var row = root.rows[r]
+            for (var i = 0; i < row.length; ++i) {
+                var w = row[i].bar ? root.barW : root.slotW
+                if (lx >= x && lx < x + w && !row[i].bar) {
+                    var next = row[i].arrow === "" ? "D" : row[i].arrow === "D" ? "U" : ""
+                    root.arrowClicked(row[i].s, row[i].e, next)
+                    return
+                }
+                x += w
             }
         }
     }

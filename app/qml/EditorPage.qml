@@ -751,18 +751,6 @@ Rectangle {
                                         }
                                     }
 
-                                    ChordTab {
-                                        visible: secCard.modelData.chords.length > 0
-                                        width: parent.width
-                                        chords: visible ? secCard.modelData.chords : []
-                                        song: page.draft
-                                        strum: partStrum.strum
-                                        section: secCard.modelData
-                                        zoom: 0.9
-                                        rev: page.rev
-                                        editing: true
-                                        onEdited: {}  // sem bump: refazer as partes perderia a nota escolhida
-                                    }
 
                                     AppTextArea {
                                         visible: secCard.showTab
@@ -841,7 +829,7 @@ Rectangle {
                             wrapMode: Text.WordWrap
                             text: page.distinctChords.length === 0
                                   ? "Os acordes das partes aparecem aqui."
-                                  : "Toque num acorde para mudar a forma no braço (casas, dedos, cordas soltas ou abafadas). Para o mesmo acorde com duas formas, escreva com apelido nas partes: Gm7@2."
+                                  : "Toque num acorde para abrir o editor de braço e mudar a forma (casas, dedos, O e X). Para o mesmo acorde com duas formas, escreva com apelido: Gm7@2."
                             color: Theme.textDim
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSize - 1
@@ -913,57 +901,12 @@ Rectangle {
                             AppButton { text: "Pronto"; suggested: true; onClicked: page.editingChord = "" }
                         }
 
-                        RowLayout {
+                        // Editor de braço: clicar na casa põe o dedo, em cima troca O/X.
+                        ChordEditor {
                             width: parent.width
-                            spacing: 16
-                            Column {
-                                spacing: 4
-                                Repeater {
-                                    model: 6
-                                    RowLayout {
-                                        id: stringRow
-                                        required property int index
-                                        readonly property int s: 5 - index    // agudo em cima
-                                        readonly property int fret: voicingCard.v ? voicingCard.v.frets[s] : -1
-                                        readonly property int finger: voicingCard.v ? voicingCard.v.fingers[s] : 0
-                                        spacing: 6
-                                        Text {
-                                            Layout.preferredWidth: 18
-                                            text: ["E", "A", "D", "G", "B", "e"][stringRow.s]
-                                            color: Theme.textDim
-                                            font.family: Theme.monoFamily
-                                            font.pixelSize: Theme.fontSize
-                                            font.weight: Font.Bold
-                                        }
-                                        AppButton {
-                                            iconName: "remove"
-                                            onClicked: { voicingCard.v.frets[stringRow.s] = Math.max(-1, stringRow.fret - 1); if (voicingCard.v.frets[stringRow.s] <= 0) voicingCard.v.fingers[stringRow.s] = 0; page.bump() }
-                                        }
-                                        Text {
-                                            Layout.preferredWidth: 64
-                                            horizontalAlignment: Text.AlignHCenter
-                                            text: stringRow.fret < 0 ? "não toca" : stringRow.fret === 0 ? "solta" : stringRow.fret + "ª casa"
-                                            color: stringRow.fret < 0 ? Theme.destructive : Theme.text
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: Theme.fontSize - 1
-                                        }
-                                        AppButton {
-                                            iconName: "add"
-                                            onClicked: { voicingCard.v.frets[stringRow.s] = Math.min(20, stringRow.fret + 1); page.bump() }
-                                        }
-                                        AppButton {
-                                            enabled: stringRow.fret > 0
-                                            text: stringRow.finger === 5 ? "polegar" : stringRow.finger > 0 ? "dedo " + stringRow.finger : "dedo –"
-                                            onClicked: { voicingCard.v.fingers[stringRow.s] = (stringRow.finger + 1) % 6; page.bump() }
-                                        }
-                                    }
-                                }
-                            }
-                            BigChordDiagram {
-                                Layout.alignment: Qt.AlignTop
-                                chord: Examples.chordName(page.editingChord)
-                                voicing: voicingCard.v
-                            }
+                            voicing: voicingCard.v
+                            rev: page.rev
+                            onChanged: page.bump()
                         }
                     }
                 }

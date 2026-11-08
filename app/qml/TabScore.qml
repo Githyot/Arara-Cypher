@@ -14,6 +14,20 @@ Canvas {
     property int startNumber: 0        // número do compasso (0 = não mostra)
     property string label: ""          // nome da parte, em cima da primeira linha
     property bool editing: false       // tocar embaixo da nota põe/troca a seta
+    property bool showChords: false    // escreve em cima o acorde marcado na tab
+    property int semitones: 0
+    onShowChordsChanged: requestPaint()
+    // Acordes marcados na tab (linha de acordes em cima), por bloco e toque.
+    readonly property var marks: {
+        if (!showChords || tab.length === 0) return []
+        var m = JSON.parse(Music.tabModel(tab))
+        return m.map(function (sys) { return sys.chords || [] })
+    }
+    function markAt(s, e) {
+        var cs = marks[s] || []
+        for (var i = 0; i < cs.length; ++i) if (cs[i].at === e) return cs[i].name
+        return ""
+    }
     signal arrowClicked(int system, int event, string arrow)
 
     // Eventos em ordem (notas e barras), com a seta da batida de cada nota
@@ -21,17 +35,17 @@ Canvas {
     readonly property var events: {
         if (tab.length === 0) return []
         var systems = JSON.parse(Music.lessonTab(tab))
-        var out = []
+        var out = [], seg = 0
         for (var s = 0; s < systems.length; ++s) {
             var sys = systems[s]
-            if (s > 0) out.push({ bar: true })
+            if (s > 0) { out.push({ bar: true }); seg++ }
             var bi = 0
             for (var e = 0; e < sys.events.length; ++e) {
                 while (bi < sys.bars.length && sys.bars[bi] < sys.events[e].col) {
-                    if (out.length && !out[out.length - 1].bar) out.push({ bar: true })
+                    if (out.length && !out[out.length - 1].bar) { out.push({ bar: true }); seg++ }
                     bi++
                 }
-                out.push({ notes: sys.events[e].notes, arrow: sys.events[e].arrow || "", s: s, e: e })
+                out.push({ notes: sys.events[e].notes, arrow: sys.events[e].arrow || "", s: s, e: e, seg: seg })
             }
         }
         while (out.length && out[out.length - 1].bar) out.pop()
@@ -59,7 +73,7 @@ Canvas {
     // Espaço em cima: a nota mais alta acima da linha de cima, a haste
     // (3,5 espaços) e a barra da colcheia.
     readonly property real headroom: Math.max(18, (maxStep - 38) * gap / 2 + gap * 3.5 + 8)
-    readonly property real topPad: (label.length > 0 ? 14 : 0) + headroom
+    readonly property real topPad: (label.length > 0 ? 14 : 0) + (marks.some(function (c) { return c.length > 0 }) ? 16 : 0) + headroom
     readonly property real staffH: gap * 4
     readonly property real rowH: topPad + staffH + gap * 6 + tabGap * 5 + 22 + (hasArrows || editing ? 20 : 0)
 
@@ -195,6 +209,13 @@ Canvas {
                     continue
                 }
                 var cx = x + slotW / 2
+                // Nome do acorde marcado na tab em cima deste toque.
+                var mark = showChords ? markAt(ev.s, ev.e) : ""
+                if (mark) {
+                    ctx.fillStyle = Theme.chord
+                    ctx.font = "bold 13px monospace"
+                    ctx.fillText(Music.transposeChord(Examples.chordName(mark), semitones), cx - 6, y0 + (label.length > 0 ? 28 : 13))
+                }
                 // Tab.
                 ctx.font = "bold 11px sans-serif"
                 for (var k = 0; k < ev.notes.length; ++k) {

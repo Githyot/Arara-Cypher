@@ -355,11 +355,7 @@ Rectangle {
                         SegmentedControl {
                             model: [{ value: "all", label: "Tudo" },
                                     { value: "names", label: "Nomes" },
-                                    { value: "diagram", label: "Braço" },
-                                    { value: "big", label: "Detalhado" },
-                                    { value: "tab", label: "Tab" },
-                                    { value: "score", label: "Partitura" },
-                                    { value: "lesson", label: "Aula" }]
+                                    { value: "score", label: "Partitura" }]
                             current: page.viewMode
                             onActivated: (v) => page.viewMode = v
                         }
@@ -377,7 +373,7 @@ Rectangle {
                         }
                         AppButton {
                             visible: page.chordMode === "tab" || page.viewMode === "all" || (page.viewMode === "score" && !page.fullScore)
-                            text: page.editingTab ? "Concluir edição" : "Editar tab"
+                            text: page.editingTab ? "Concluir edição" : (page.viewMode === "all" ? "Editar braços" : "Editar tab")
                             suggested: page.editingTab
                             onClicked: page.editingTab = !page.editingTab
                         }
@@ -664,10 +660,12 @@ Rectangle {
                                     onBeat: (strong) => metroSound.play(strong)
                                 }
                                 TabScore {
-                                    visible: prefs.showTabs && !!section.modelData.tab && (page.viewMode === "tab" || page.viewMode === "score" || (page.viewMode === "all" && page.editingTab))
+                                    visible: prefs.showTabs && !!section.modelData.tab && (page.viewMode === "tab" || page.viewMode === "score")
                                     width: parent.width
                                     height: implicitHeight
                                     tab: page.rev, visible ? page.song.sections[section.index].tab : ""
+                                    showChords: true
+                                    semitones: page.shift
                                     keyName: page.song ? page.t(page.song.key) : "C"
                                     zoom: page.zoom
                                     editing: page.editingTab
@@ -683,7 +681,9 @@ Rectangle {
                                 // Tudo: braço + partitura + tab de cada acorde, num quadro só
                                 // (editando, mostra a tab inteira para mexer).
                                 SectionView {
-                                    visible: page.viewMode === "all" && !page.editingTab
+                                    visible: page.viewMode === "all"
+                                    editing: page.editingTab
+                                    onEdited: page.persist()
                                     width: parent.width
                                     section: visible ? page.song.sections[section.index] : null
                                     song: page.song
@@ -694,7 +694,7 @@ Rectangle {
                                     rev: page.rev
                                 }
                                 ChordTab {
-                                    visible: (page.chordMode === "tab" || (page.viewMode === "all" && page.editingTab)) && section.modelData.chords.length > 0
+                                    visible: page.chordMode === "tab" && section.modelData.chords.length > 0
                                     width: parent.width
                                     chords: visible ? section.modelData.chords : []
                                     song: page.song

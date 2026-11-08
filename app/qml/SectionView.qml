@@ -14,16 +14,29 @@ Flow {
     property real zoom: 1
     property string keyName: "C"
     property int rev: 0
+    property bool editing: false       // mostra "Editar braço" em cada quadro
+    signal edited()
     spacing: 10
+
+    // Forma própria desta música para o acorde (cria a partir da do app).
+    function ownVoicing(token) {
+        if (!song) return null
+        if (!song.voicings) song.voicings = {}
+        if (!song.voicings[token]) {
+            var s = Examples.shape(Examples.chordName(token), 0, null)
+            song.voicings[token] = s ? { frets: s.frets.slice(), fingers: s.fingers.slice() }
+                                     : { frets: [-1, -1, -1, -1, -1, -1], fingers: [0, 0, 0, 0, 0, 0] }
+        }
+        return song.voicings[token]
+    }
 
     function t(name) { return Music.transposeChord(name, semitones) }
 
     // Pedaços da tab: [{ name, tab, events }] na ordem.
     readonly property var segments: {
-        rev
         if (!section || !section.tab) return []
         var systems = JSON.parse(Music.tabModel(section.tab))
-        var out = []
+        var out = [], nextChord = 0
         for (var s = 0; s < systems.length; ++s) {
             var sys = systems[s]
             var chords = (sys.chords || []).slice().sort(function (a, b) { return a.at - b.at })
@@ -46,9 +59,9 @@ Flow {
         return out
     }
     // Sem tab: um quadro por acorde, com a batida da parte.
-    // Tab sem nomes de acorde em cima: mostra os acordes da parte também.
-    readonly property var chordItems: !section ? []
-        : section.tab && segments.some(function (g) { return g.name !== "" }) ? [] : (section.chords || [])
+    // A tab manda: com tab, só aparecem os braços dos acordes marcados nela
+    // (Acorde neste toque). Sem tab, um quadro por acorde da parte.
+    readonly property var chordItems: !section || section.tab ? [] : (section.chords || [])
     function patternOf(i) {
         var base = strum ? strum.pattern : ["D"]
         var own = section && section.measures ? section.measures[i] : null
@@ -67,8 +80,9 @@ Flow {
             id: seg
             required property var modelData
             readonly property string name: modelData.name
-            readonly property var voicing: root.song ? Examples.voicing(root.song, name) : null
-            width: Math.max(diag.visible ? diag.implicitWidth * root.zoom + 16 : 0, score.width + 16, title.implicitWidth + 24)
+            readonly property var voicing: root.rev, root.song ? Examples.voicing(root.song, name) : null
+            property bool open: false
+            width: Math.max(diag.visible ? diag.implicitWidth * root.zoom + 16 : 0, score.width + 16, title.implicitWidth + 24, open ? segEditor.implicitWidth + 16 : 0)
             height: col.implicitHeight + 16
             radius: Theme.radiusSmall
             color: Qt.rgba(Theme.chord.r, Theme.chord.g, Theme.chord.b, Theme.dark ? 0.12 : 0.07)
@@ -102,6 +116,20 @@ Flow {
                         semitones: root.semitones
                     }
                 }
+                AppButton {
+                    visible: root.editing && seg.name !== ""
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: seg.open ? "Fechar editor de braço" : "Editar braço"
+                    onClicked: { if (!seg.open) root.ownVoicing(seg.name); seg.open = !seg.open }
+                }
+                ChordEditor {
+                    id: segEditor
+                    visible: root.editing && seg.open
+                    width: implicitWidth
+                    voicing: seg.open ? root.ownVoicing(seg.name) : null
+                    rev: root.rev
+                    onChanged: root.edited()
+                }
                 TabScore {
                     id: score
                     // Pedaço comprido quebra em linhas dentro da largura da tela.
@@ -123,8 +151,9 @@ Flow {
             required property string modelData
             required property int index
             readonly property string name: Examples.chordName(modelData)
-            readonly property var voicing: root.song ? Examples.voicing(root.song, modelData) : null
-            width: Math.max(big.implicitWidth * root.zoom, notation.width, strumTab.implicitWidth * root.zoom, label.implicitWidth) + 24
+            readonly property var voicing: root.rev, root.song ? Examples.voicing(root.song, modelData) : null
+            property bool open: false
+            width: Math.max(big.implicitWidth * root.zoom, notation.width, strumTab.implicitWidth * root.zoom, label.implicitWidth, open ? boxEditor.implicitWidth : 0) + 24
             height: inner.implicitHeight + 16
             radius: Theme.radiusSmall
             color: Qt.rgba(Theme.chord.r, Theme.chord.g, Theme.chord.b, Theme.dark ? 0.12 : 0.07)
@@ -155,6 +184,20 @@ Flow {
                         voicing: box.voicing
                         semitones: root.semitones
                     }
+                }
+                AppButton {
+                    visible: root.editing
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: box.open ? "Fechar editor de braço" : "Editar braço"
+                    onClicked: { if (!box.open) root.ownVoicing(box.modelData); box.open = !box.open }
+                }
+                ChordEditor {
+                    id: boxEditor
+                    visible: root.editing && box.open
+                    width: implicitWidth
+                    voicing: box.open ? root.ownVoicing(box.modelData) : null
+                    rev: root.rev
+                    onChanged: root.edited()
                 }
                 NotationView {
                     id: notation

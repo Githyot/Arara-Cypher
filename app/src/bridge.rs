@@ -93,6 +93,12 @@ pub mod qobject {
         #[cxx_name = "readPage"]
         fn read_page(&self, html: &QString) -> QString;
 
+        /// Escolhe a letra certa na resposta da busca do LRCLIB:
+        /// `{found, instrumental, plain, synced:[{t, text}]}`.
+        #[qinvokable]
+        #[cxx_name = "pickLyrics"]
+        fn pick_lyrics(&self, results: &QString, title: &QString, artist: &QString) -> QString;
+
         /// Lê uma música inteira de um texto: partes, batidas com BPM, formas,
         /// tom, capotraste, artista e título. JSON no formato das músicas.
         #[qinvokable]
@@ -234,6 +240,17 @@ impl qobject::Library {
 
     pub fn is_chord_token(&self, text: &QString) -> bool {
         sheet::is_chord_token(&text.to_string())
+    }
+
+    pub fn pick_lyrics(&self, results: &QString, title: &QString, artist: &QString) -> QString {
+        QString::from(
+            araracypher_core::lyrics::pick_json(
+                &results.to_string(),
+                &title.to_string(),
+                &artist.to_string(),
+            )
+            .as_str(),
+        )
     }
 
     pub fn parse_song(&self, text: &QString) -> QString {

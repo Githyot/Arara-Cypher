@@ -107,7 +107,7 @@ fn new_id(title: &str) -> String {
     }
 }
 
-fn fold_accent(c: char) -> Option<char> {
+pub(crate) fn fold_accent(c: char) -> Option<char> {
     Some(match c {
         'á' | 'à' | 'â' | 'ã' | 'ä' | 'Á' | 'À' | 'Â' | 'Ã' => 'a',
         'é' | 'ê' | 'è' | 'É' | 'Ê' => 'e',

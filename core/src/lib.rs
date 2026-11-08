@@ -5,6 +5,7 @@
 
 pub mod chord;
 pub mod library;
+pub mod lyrics;
 pub mod ocr;
 pub mod rhythm;
 pub mod shape;

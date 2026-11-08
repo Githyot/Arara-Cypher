@@ -65,6 +65,63 @@ Rectangle {
         else if (e.key === Qt.Key_PageUp || e.key === Qt.Key_Up || e.key === Qt.Key_Left) { page_(-1); e.accepted = true }
     }
 
+    // ---- Letra (LRCLIB) ----
+    // Baixada quando o usuário pede; nas músicas dele fica salva na biblioteca.
+    property var lyrics: song && song.lyrics ? { plain: song.lyrics, synced: song.syncedLyrics || [] } : null
+    property string lyricsStatus: ""
+    function fetchLyrics() {
+        if (!song) return
+        lyricsStatus = "Buscando a letra no LRCLIB..."
+        var url = "https://lrclib.net/api/search?track_name=" + encodeURIComponent(song.title)
+                + (song.artist ? "&artist_name=" + encodeURIComponent(song.artist) : "")
+        var xhr = new XMLHttpRequest()
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState !== XMLHttpRequest.DONE) return
+            if (xhr.status !== 200) {
+                page.lyricsStatus = "Não consegui falar com o LRCLIB" + (xhr.status ? " (erro " + xhr.status + ")" : "") + ". Veja a internet e tente de novo."
+                return
+            }
+            var r = JSON.parse(Library.pickLyrics(xhr.responseText, page.song.title, page.song.artist || ""))
+            if (!r.found) { page.lyricsStatus = "O LRCLIB não tem a letra dessa música. Confira o título e o artista no editor."; return }
+            if (r.instrumental) { page.lyricsStatus = "O LRCLIB diz que essa música é instrumental."; return }
+            page.song.lyrics = r.plain
+            page.song.syncedLyrics = r.synced
+            page.lyrics = { plain: r.plain, synced: r.synced }
+            if (page.song.id) {
+                Library.save(JSON.stringify(page.song))
+                page.lyricsStatus = "Letra salva na sua cópia."
+            } else {
+                page.lyricsStatus = "Para guardar a letra, toque em Editar uma cópia."
+            }
+        }
+        xhr.open("GET", url)
+        xhr.setRequestHeader("Lrclib-Client", "AraraCypher " + Music.version + " (https://github.com/Githyot/Arara-Cypher)")
+        xhr.send()
+    }
+    // Acompanhar a letra sincronizada: um relógio desde o começo da música.
+    property bool lyricsPlaying: false
+    property real lyricsT0: 0
+    property real lyricsNow: 0
+    property int lyricsLine: -1
+    Timer {
+        interval: 100
+        repeat: true
+        running: page.lyricsPlaying
+        onTriggered: {
+            page.lyricsNow = (Date.now() - page.lyricsT0) / 1000
+            var s = page.lyrics ? page.lyrics.synced : []
+            var i = -1
+            for (var k = 0; k < s.length; ++k) if (s[k].t <= page.lyricsNow) i = k
+            page.lyricsLine = i
+            if (s.length && page.lyricsNow > s[s.length - 1].t + 10) page.lyricsPlaying = false
+        }
+    }
+    function toggleLyrics() {
+        if (lyricsPlaying) { lyricsPlaying = false; return }
+        lyricsT0 = Date.now() - Math.max(0, lyricsNow) * 1000
+        lyricsPlaying = true
+    }
+
     // ---- Metrônomo no BPM da música ----
     readonly property int songBpm: {
         if (song && song.bpm) return song.bpm
@@ -700,11 +757,101 @@ Rectangle {
                     }
                 }
 
+                // ---- Letra ----
+                Collapsible {
+                    width: parent.width
+                    title: "Letra"
+                    expanded: false
+                    summary: page.lyrics ? (page.lyrics.synced.length ? "sincronizada · " : "") + page.lyrics.plain.split("\n")[0]
+                                         : "buscar no LRCLIB"
+                    Card {
+                        width: parent.width
+                        Row {
+                            spacing: 8
+                            AppButton {
+                                visible: !page.lyrics
+                                text: "Buscar letra no LRCLIB"
+                                suggested: true
+                                onClicked: page.fetchLyrics()
+                            }
+                            AppButton {
+                                visible: !!page.lyrics && page.lyrics.synced.length > 0
+                                text: page.lyricsPlaying ? "Pausar" : (page.lyricsNow > 0 ? "Continuar" : "Acompanhar")
+                                suggested: !page.lyricsPlaying
+                                onClicked: page.toggleLyrics()
+                            }
+                            AppButton {
+                                visible: !!page.lyrics && page.lyrics.synced.length > 0 && page.lyricsNow > 0
+                                text: "Do começo"
+                                flat: true
+                                onClicked: { page.lyricsNow = 0; page.lyricsLine = -1; page.lyricsT0 = Date.now() }
+                            }
+                            AppButton {
+                                visible: !!page.lyrics
+                                text: "Buscar de novo"
+                                flat: true
+                                onClicked: page.fetchLyrics()
+                            }
+                        }
+                        Text {
+                            visible: page.lyricsStatus.length > 0
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            text: page.lyricsStatus
+                            color: Theme.textDim
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSize - 1
+                        }
+                        // Sincronizada: linha da vez em destaque.
+                        Column {
+                            visible: !!page.lyrics && page.lyrics.synced.length > 0
+                            width: parent.width
+                            spacing: 4
+                            Repeater {
+                                model: page.lyrics ? page.lyrics.synced : []
+                                Text {
+                                    required property var modelData
+                                    required property int index
+                                    width: parent.width
+                                    wrapMode: Text.WordWrap
+                                    text: modelData.text || "♪"
+                                    color: index === page.lyricsLine ? Theme.chord : (index < page.lyricsLine ? Theme.textDim : Theme.text)
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: (Theme.fontSize + (index === page.lyricsLine ? 4 : 1)) * page.zoom
+                                    font.weight: index === page.lyricsLine ? Font.Bold : Font.Normal
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        onClicked: { page.lyricsNow = parent.modelData.t; page.lyricsLine = parent.index; page.lyricsT0 = Date.now() - parent.modelData.t * 1000 }
+                                    }
+                                }
+                            }
+                        }
+                        Text {
+                            visible: !!page.lyrics && page.lyrics.synced.length === 0
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            text: page.lyrics ? page.lyrics.plain : ""
+                            color: Theme.text
+                            font.family: Theme.fontFamily
+                            font.pixelSize: (Theme.fontSize + 1) * page.zoom
+                            lineHeight: 1.3
+                        }
+                        Text {
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            text: "Letras de lrclib.net. Ficam só no seu computador."
+                            color: Theme.textDim
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSize - 2
+                        }
+                    }
+                }
+
                 Text {
-                    visible: !!page.song && !page.song.id
+                    visible: !!page.song && !page.song.id && !page.lyrics
                     width: parent.width
                     wrapMode: Text.WordWrap
-                    text: "A letra não está incluída porque tem direitos autorais. Acompanhe pelo vídeo."
+                    text: "A letra não vem com o app. Abra Letra acima para baixar do LRCLIB."
                     color: Theme.textDim
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSize - 2

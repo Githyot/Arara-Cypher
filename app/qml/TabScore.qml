@@ -16,6 +16,8 @@ Canvas {
     property bool editing: false       // tocar embaixo da nota põe/troca a seta
     property bool showChords: false    // escreve em cima o acorde marcado na tab
     property int semitones: 0
+    property bool showStaff: true      // false: só a tab (sem a pauta)
+    onShowStaffChanged: requestPaint()
     onShowChordsChanged: requestPaint()
     // Acordes marcados na tab (linha de acordes em cima), por bloco e toque.
     readonly property var marks: {
@@ -72,10 +74,11 @@ Canvas {
     }
     // Espaço em cima: a nota mais alta acima da linha de cima, a haste
     // (3,5 espaços) e a barra da colcheia.
-    readonly property real headroom: Math.max(18, (maxStep - 38) * gap / 2 + gap * 3.5 + 8)
+    readonly property real headroom: !showStaff ? 6 : Math.max(18, (maxStep - 38) * gap / 2 + gap * 3.5 + 8)
     readonly property real topPad: (label.length > 0 ? 14 : 0) + (marks.some(function (c) { return c.length > 0 }) ? 16 : 0) + headroom
-    readonly property real staffH: gap * 4
-    readonly property real rowH: topPad + staffH + gap * 6 + tabGap * 5 + 22 + (hasArrows || editing ? 20 : 0)
+    readonly property real staffH: showStaff ? gap * 4 : 0
+    readonly property real staffGap: showStaff ? gap * 6 : 0
+    readonly property real rowH: topPad + staffH + staffGap + tabGap * 5 + 22 + (hasArrows || editing ? 20 : 0)
 
     // Divide os eventos em linhas que cabem na largura.
     readonly property var rows: {
@@ -143,7 +146,7 @@ Canvas {
             var y0 = r * rowH
             var staffTop = y0 + topPad
             var staffBottom = staffTop + staffH
-            var tabTop = staffBottom + gap * 6
+            var tabTop = staffBottom + staffGap
             var tabBottom = tabTop + tabGap * 5
             var yOf = function (step) { return staffBottom - (step - 30) * gap / 2 }
             // A última linha termina logo depois da última nota.
@@ -159,7 +162,7 @@ Canvas {
                 ctx.font = "bold 11px sans-serif"
                 ctx.fillText(label.toUpperCase(), clefW, y0 + 12)
             }
-            if (measure > 0) {
+            if (measure > 0 && showStaff) {
                 ctx.fillStyle = dim
                 ctx.font = "11px sans-serif"
                 ctx.fillText(String(measure), 14, staffTop - gap * 1.4)
@@ -168,14 +171,16 @@ Canvas {
             // Chave, linhas, clave e letras da tab.
             ctx.strokeStyle = ink
             ctx.lineWidth = 2
-            ctx.beginPath()
-            ctx.moveTo(8, staffTop)
-            ctx.bezierCurveTo(2, staffTop + 10, 8, (staffTop + tabBottom) / 2 - 10, 3, (staffTop + tabBottom) / 2)
-            ctx.bezierCurveTo(8, (staffTop + tabBottom) / 2 + 10, 2, tabBottom - 10, 8, tabBottom)
-            ctx.stroke()
+            if (showStaff) {
+                ctx.beginPath()
+                ctx.moveTo(8, staffTop)
+                ctx.bezierCurveTo(2, staffTop + 10, 8, (staffTop + tabBottom) / 2 - 10, 3, (staffTop + tabBottom) / 2)
+                ctx.bezierCurveTo(8, (staffTop + tabBottom) / 2 + 10, 2, tabBottom - 10, 8, tabBottom)
+                ctx.stroke()
+            }
             ctx.strokeStyle = dim
             ctx.lineWidth = 1
-            for (var l = 0; l < 5; ++l) {
+            for (var l = 0; showStaff && l < 5; ++l) {
                 var ly = Math.round(staffTop + l * gap) + 0.5
                 ctx.beginPath(); ctx.moveTo(12, ly); ctx.lineTo(rowEnd, ly); ctx.stroke()
             }
@@ -184,9 +189,9 @@ Canvas {
                 ctx.beginPath(); ctx.moveTo(12, ty); ctx.lineTo(rowEnd, ty); ctx.stroke()
             }
             ctx.beginPath(); ctx.moveTo(12.5, staffTop); ctx.lineTo(12.5, tabBottom); ctx.stroke()
-            ctx.beginPath(); ctx.moveTo(rowEnd - 0.5, staffTop); ctx.lineTo(rowEnd - 0.5, staffBottom); ctx.stroke()
+            if (showStaff) { ctx.beginPath(); ctx.moveTo(rowEnd - 0.5, staffTop); ctx.lineTo(rowEnd - 0.5, staffBottom); ctx.stroke() }
             ctx.beginPath(); ctx.moveTo(rowEnd - 0.5, tabTop); ctx.lineTo(rowEnd - 0.5, tabBottom); ctx.stroke()
-            drawClef(ctx, ink, 22, staffTop)
+            if (showStaff) drawClef(ctx, ink, 22, staffTop)
             ctx.fillStyle = ink
             ctx.font = "bold 11px sans-serif"
             ctx.fillText("T", 30, tabTop + tabGap * 1.4)
@@ -201,7 +206,7 @@ Canvas {
                     var bx = Math.round(x + barW / 2) + 0.5
                     ctx.strokeStyle = ink
                     ctx.lineWidth = 1
-                    ctx.beginPath(); ctx.moveTo(bx, staffTop); ctx.lineTo(bx, staffBottom); ctx.stroke()
+                    if (showStaff) { ctx.beginPath(); ctx.moveTo(bx, staffTop); ctx.lineTo(bx, staffBottom); ctx.stroke() }
                     ctx.beginPath(); ctx.moveTo(bx, tabTop); ctx.lineTo(bx, tabBottom); ctx.stroke()
                     stems.push(null)
                     x += barW
@@ -262,6 +267,7 @@ Canvas {
                     ctx.font = "bold 11px sans-serif"
                 }
                 // Pauta.
+                if (!showStaff) { stems.push(null); x += slotW; continue }
                 var minY = 1e9, maxY = -1e9, prevStep = -100
                 for (var m = 0; m < ev.notes.length; ++m) {
                     var note = ev.notes[m]

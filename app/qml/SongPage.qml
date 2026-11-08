@@ -233,8 +233,21 @@ Rectangle {
             return Examples.strokeArrow(p)
         }).join(" ")
     }
+    // Acordes da parte. A tab manda: com tab, só os marcados nela
+    // (Acorde neste toque), na ordem; sem tab, os acordes da parte.
+    function partChords(sec) {
+        if (!sec) return []
+        if (!sec.tab) return sec.chords || []
+        var out = []
+        JSON.parse(Music.tabModel(sec.tab)).forEach(function (sys) {
+            (sys.chords || []).slice().sort(function (a, b) { return a.at - b.at }).forEach(function (c) {
+                if (c.name && out.indexOf(c.name) < 0) out.push(c.name)
+            })
+        })
+        return out
+    }
     function chordList(sec) {
-        var names = sec.chords.map(function (c) { return t(Examples.chordName(c)) })
+        var names = partChords(sec).map(function (c) { return t(Examples.chordName(c)) })
         var s = names.join("  ")
         if (sec.tab) s += (s ? "  · " : "") + "tab"
         if (!s && sec.note) s = sec.note
@@ -629,6 +642,7 @@ Rectangle {
                             required property int index
                             readonly property var strum: Examples.strumOf(page.song, modelData)
                             readonly property string sameAs: page.sameAs(index)
+                            readonly property var chords: page.rev, page.partChords(page.song.sections[index])
                             width: (secGrid.width - (secGrid.columns - 1) * secGrid.columnSpacing) / secGrid.columns
                             title: modelData.name
                             badge: modelData.repeat > 1 ? modelData.repeat + "×" : ""
@@ -641,10 +655,17 @@ Rectangle {
 
                             Card {
                                 width: parent.width
-                                TabText {
+                                // Nomes: só a tab, no padrão novo (cores, anel no 0, nome do
+                                // acorde marcado em cima do toque), sem a pauta.
+                                TabScore {
                                     visible: prefs.showTabs && !!section.modelData.tab && ["tab", "score", "lesson", "all"].indexOf(page.viewMode) < 0
                                     width: parent.width
-                                    tab: section.modelData.tab || ""
+                                    height: implicitHeight
+                                    tab: page.rev, visible ? page.song.sections[section.index].tab : ""
+                                    showStaff: false
+                                    showChords: true
+                                    semitones: page.shift
+                                    keyName: page.song ? page.t(page.song.key) : "C"
                                     zoom: page.zoom
                                 }
                                 LessonTab {
@@ -708,11 +729,11 @@ Rectangle {
                                     onEdited: page.persist()
                                 }
                                 Flow {
-                                    visible: page.chordMode !== "tab" && page.viewMode !== "all" && section.modelData.chords.length > 0
+                                    visible: page.chordMode !== "tab" && page.viewMode !== "all" && section.chords.length > 0
                                     width: parent.width
                                     spacing: 8
                                     Repeater {
-                                        model: section.modelData.chords
+                                        model: section.chords
                                         Rectangle {
                                             id: chordBox
                                             required property string modelData

@@ -505,7 +505,7 @@ pub fn render(systems: &[EditSystem]) -> String {
                     .notes
                     .iter()
                     .find(|n| n.string == string)
-                    .map(&token)
+                    .map(token)
                     .unwrap_or_default();
                 l.push_str(&t);
                 l.push_str(&"-".repeat(w - t.chars().count() + 3));

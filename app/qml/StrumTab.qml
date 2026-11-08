@@ -34,6 +34,15 @@ Item {
     readonly property var stringNames: ["E", "A", "D", "G", "B", "e"]
 
     property var voicing: null        // forma tirada da aula (opcional)
+    // Casas escritas à mão neste compasso: { "tempo:corda": { f: casa (255 = x), g: dedo } }.
+    property var cells: ({})
+    function cellAt(step, string) { return cells ? cells[step + ":" + string] : undefined }
+    function fingerAt(step, string) {
+        var c = cellAt(step, string)
+        if (c && c.g !== undefined) return c.g
+        if (c && c.f !== undefined) return 0
+        return shape ? (shape.fingers[string] || 0) : 0
+    }
     property int rev: 0               // muda quando a forma é editada no lugar
     // Acorde que o app não conhece (ex.: Em7(9)) e sem forma salva: tab vazia,
     // para dar para pôr as notas uma a uma.
@@ -47,9 +56,14 @@ Item {
         for (var i = 0; i < pattern.length; ++i) {
             var c = [null, null, null, null, null, null]
             var code = pattern[i]
-            var strings = Examples.strokeStrings(shape, code)
-            for (var k = 0; k < strings.length; ++k)
-                c[strings[k]] = Examples.isMute(code) ? "x" : shape.frets[strings[k]]
+            var strings = Examples.isPick(code)
+                ? Examples.pickStrings(code).filter(function (s) { return shape.frets[s] >= 0 || cellAt(i, s) })
+                : Examples.strokeStrings(shape, code)
+            for (var k = 0; k < strings.length; ++k) {
+                var own = cellAt(i, strings[k])
+                c[strings[k]] = Examples.isMute(code) ? "x"
+                    : own && own.f !== undefined ? (own.f === 255 ? "x" : own.f) : shape.frets[strings[k]]
+            }
             cols.push(c)
         }
         return cols
@@ -182,11 +196,21 @@ Item {
                         color: Theme.textDim
                         opacity: 0.6
                     }
-                    // Casa tocada: o número, com contorno na cor do dedo.
+                    // Casa tocada: o número (na cor da casa), com contorno na cor do dedo.
+                    // Corda solta junto de outras notas vira um anel pequeno; sozinha, fica o 0.
+                    readonly property bool open: value === 0 && root.columns.length > index && root.columns[index].filter(function (v) { return v !== null }).length > 1
                     Rectangle {
-                        readonly property int finger: cell.value !== null && cell.value !== "x" && root.shape
-                                                      ? (root.shape.fingers[stringRow.string] || 0) : 0
-                        visible: cell.value !== null
+                        visible: cell.open
+                        anchors.centerIn: parent
+                        width: 10; height: 10; radius: 5
+                        color: Theme.card
+                        border.width: 2
+                        border.color: Theme.textDim
+                    }
+                    Rectangle {
+                        readonly property int finger: cell.value !== null && cell.value !== "x"
+                                                      ? root.fingerAt(cell.index, stringRow.string) : 0
+                        visible: cell.value !== null && !cell.open
                         anchors.centerIn: parent
                         width: 19
                         height: 19
@@ -197,7 +221,7 @@ Item {
                         Text {
                             anchors.centerIn: parent
                             text: cell.value === "x" ? "×" : (cell.value !== null ? cell.value : "")
-                            color: cell.value === "x" ? Theme.textDim : Theme.chord
+                            color: cell.value === "x" ? Theme.textDim : parent.finger > 0 ? Theme.text : Theme.fretColor(cell.value)
                             font.family: Theme.fontFamily
                             font.pixelSize: String(cell.value).length > 1 ? 11 : 14
                             font.bold: true

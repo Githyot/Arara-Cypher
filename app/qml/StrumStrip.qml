@@ -11,6 +11,7 @@ Column {
     property int semitones: 0
     property var pattern: ["D"]
     property var patterns: []          // tempos de cada compasso (se mudaram só ali)
+    property var cells: []             // casas escritas à mão em cada compasso
     property var counts: []
     property real zoom: 1
     property int rev: 0                // muda quando a música é editada aqui
@@ -116,6 +117,7 @@ Column {
                         voicing: root.rev, root.song ? Examples.voicing(root.song, measure.modelData) : null
                         semitones: root.semitones
                         pattern: root.patterns[measure.chordIndex] || root.pattern
+                        cells: root.cells[measure.chordIndex] || ({})
                         counts: root.counts
                         editing: root.editing
                         selString: root.selIndex === measure.chordIndex ? root.selString : -1

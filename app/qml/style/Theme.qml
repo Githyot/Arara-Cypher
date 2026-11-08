@@ -72,6 +72,17 @@ QtObject {
         dark ? "#f8e45c" : "#c88800",   // 3 anelar: amarelo
         dark ? "#dc8add" : "#9141ac",   // 4 mínimo: roxo
         dark ? "#f66151" : "#c01c28"]   // P polegar: vermelho
+    // Cor de cada número de casa na tab (o mesmo número tem sempre a mesma
+    // cor, para ler rápido). A corda solta (0) não usa número: vira um anel.
+    readonly property var fretPalette: dark
+        ? ["#99c1f1", "#8ff0a4", "#f9f06b", "#ffbe6f", "#f66151", "#dc8add", "#62a0ea", "#57e389", "#e5a50a", "#ff7800", "#c061cb", "#5bc8af"]
+        : ["#1a5fb4", "#26a269", "#9c6f00", "#c64600", "#c01c28", "#813d9c", "#3584e4", "#2ec27e", "#986a44", "#e66100", "#9141ac", "#1d8a74"]
+    function fretColor(f) {
+        if (f === 255 || f === "x") return textDim
+        var n = parseInt(f)
+        if (isNaN(n) || n <= 0) return text
+        return fretPalette[(n - 1) % 12]
+    }
     readonly property color chord: apple ? (dark ? "#ff9f0a" : "#c93400")
                                          : (dark ? "#ffa348" : "#c64600")
 

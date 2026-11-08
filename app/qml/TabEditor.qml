@@ -378,19 +378,24 @@ Column {
                                 model: col.modelData.notes
                                 Rectangle {
                                     required property var modelData
-                                    y: root.rowH * (6 - modelData.string) + 2
+                                    // Corda solta junto de outras notas: um anel pequeno, sem número
+                                    // (menos poluído). Sozinha no toque, fica o 0.
+                                    readonly property bool open: modelData.fret === 0 && !modelData.tech && col.modelData.notes.length > 1
+                                    readonly property color ink: Theme.fretColor(modelData.fret)
+                                    y: root.rowH * (6 - modelData.string) + (open ? (root.rowH - height) / 2 : 2)
                                     anchors.horizontalCenter: parent.horizontalCenter
-                                    width: Math.max(20, t.implicitWidth + 6)
-                                    height: root.rowH - 4
+                                    width: open ? 11 : Math.max(20, t.implicitWidth + 6)
+                                    height: open ? 11 : root.rowH - 4
                                     radius: height / 2
-                                    color: Theme.card
-                                    border.width: 1.4
-                                    border.color: Theme.accent
+                                    color: open ? Theme.card : Qt.rgba(ink.r, ink.g, ink.b, 0.14)
+                                    border.width: open ? 2 : 1.4
+                                    border.color: open ? Theme.textDim : ink
                                     Text {
                                         id: t
+                                        visible: !parent.open
                                         anchors.centerIn: parent
                                         text: (parent.modelData.tech || "") + (parent.modelData.fret === root.muted ? "x" : parent.modelData.fret)
-                                        color: Theme.text
+                                        color: parent.ink
                                         font.family: Theme.fontFamily
                                         font.pixelSize: 12
                                         font.bold: true

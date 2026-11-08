@@ -204,8 +204,16 @@ Canvas {
                     var tw = ctx.measureText(label2).width
                     ctx.fillStyle = Theme.card
                     ctx.fillRect(cx - tw / 2 - 2, tyy - 6, tw + 4, 12)
-                    ctx.fillStyle = ink
-                    ctx.fillText(label2, cx - tw / 2, tyy + 4)
+                    if (n.fret === 0 && !n.tech && ev.notes.length > 1) {
+                        // Corda solta junto de outras notas: anel pequeno em vez do 0
+                        // (menos poluído). Sozinha no toque, fica o 0.
+                        ctx.strokeStyle = dim
+                        ctx.lineWidth = 1.6
+                        ctx.beginPath(); ctx.arc(cx, tyy, 3.6, 0, 2 * Math.PI); ctx.stroke()
+                    } else {
+                        ctx.fillStyle = Theme.fretColor(n.fret)
+                        ctx.fillText(label2, cx - tw / 2, tyy + 4)
+                    }
                     if (n.tech) {
                         ctx.fillStyle = accent
                         ctx.font = "10px sans-serif"

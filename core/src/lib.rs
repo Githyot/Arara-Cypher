@@ -6,8 +6,10 @@
 pub mod chord;
 pub mod library;
 pub mod ocr;
+pub mod rhythm;
 pub mod shape;
 pub mod sheet;
+pub mod sound;
 pub mod tab;
 
 pub use chord::{Accidental, Chord, Note, ParseChordError};

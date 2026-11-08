@@ -37,7 +37,7 @@ jobs:
         run: >
           dnf install -y --setopt=install_weak_deps=False
           git gcc-c++ cmake make rust cargo rpm-build
-          qt6-qtbase-devel qt6-qtbase-private-devel qt6-qtdeclarative-devel
+          qt6-qtbase-devel qt6-qtbase-private-devel qt6-qtdeclarative-devel qt6-qtmultimedia-devel
       - uses: actions/checkout@v4
       - name: Compilar
         run: |

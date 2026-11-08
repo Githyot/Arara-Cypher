@@ -34,6 +34,16 @@ pub mod qobject {
         #[qinvokable]
         #[cxx_name = "parseTab"]
         fn parse_tab(&self, text: &QString) -> QString;
+
+        /// Arquivo WAV do "tic" do metrônomo (forte no primeiro tempo), como URL.
+        #[qinvokable]
+        #[cxx_name = "clickSound"]
+        fn click_sound(&self, accent: bool) -> QString;
+
+        /// Pontua o jogo de batida: tempos esperados e toques (JSON, em ms).
+        #[qinvokable]
+        #[cxx_name = "judgeRhythm"]
+        fn judge_rhythm(&self, expected: &QString, taps: &QString) -> QString;
     }
 
     extern "RustQt" {
@@ -109,6 +119,22 @@ impl qobject::Music {
 
     pub fn parse_tab(&self, text: &QString) -> QString {
         QString::from(tab::parse_json(&text.to_string()).as_str())
+    }
+
+    pub fn click_sound(&self, accent: bool) -> QString {
+        let name = if accent { "forte" } else { "fraco" };
+        let path = std::env::temp_dir().join(format!("araracypher-tic-{name}.wav"));
+        let wav = araracypher_core::sound::click_wav(if accent { 1760.0 } else { 1175.0 }, 60);
+        match std::fs::write(&path, wav) {
+            Ok(()) => QString::from(format!("file://{}", path.display()).as_str()),
+            Err(_) => QString::default(),
+        }
+    }
+
+    pub fn judge_rhythm(&self, expected: &QString, taps: &QString) -> QString {
+        QString::from(
+            araracypher_core::rhythm::judge_json(&expected.to_string(), &taps.to_string()).as_str(),
+        )
     }
 }
 

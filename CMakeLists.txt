@@ -88,7 +88,7 @@ if(NOT ANDROID)
     set(CPACK_RPM_PACKAGE_LICENSE "GPL-3.0-or-later")
     set(CPACK_RPM_PACKAGE_GROUP "Applications/Multimedia")
     set(CPACK_RPM_PACKAGE_URL "https://github.com/Githyot/Arara-Cypher")
-    set(CPACK_RPM_PACKAGE_REQUIRES "qt6-qtbase, qt6-qtdeclarative, tesseract, tesseract-langpack-por")
+    set(CPACK_RPM_PACKAGE_REQUIRES "qt6-qtbase, qt6-qtdeclarative, qt6-qtmultimedia, tesseract, tesseract-langpack-por")
     set(CPACK_RPM_PACKAGE_AUTOREQ ON)
     set(CPACK_RPM_FILE_NAME RPM-DEFAULT)
     # Release sobe a cada build do CI (número da execução), para o

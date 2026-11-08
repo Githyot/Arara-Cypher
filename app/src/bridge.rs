@@ -82,6 +82,22 @@ pub mod qobject {
         #[qinvokable]
         #[cxx_name = "isChordToken"]
         fn is_chord_token(&self, text: &QString) -> bool;
+
+        /// Lê a página baixada de um link de cifra: `{title, artist, key, capo, text}`.
+        #[qinvokable]
+        #[cxx_name = "readPage"]
+        fn read_page(&self, html: &QString) -> QString;
+
+        /// Lê uma música inteira de um texto: partes, batidas com BPM, formas,
+        /// tom, capotraste, artista e título. JSON no formato das músicas.
+        #[qinvokable]
+        #[cxx_name = "parseSong"]
+        fn parse_song(&self, text: &QString) -> QString;
+
+        /// Conteúdo de um arquivo de texto (.txt) escolhido pelo usuário.
+        #[qinvokable]
+        #[cxx_name = "readTextFile"]
+        fn read_text_file(&self, path: &QString) -> QString;
     }
 }
 
@@ -209,6 +225,22 @@ impl qobject::Library {
 
     pub fn is_chord_token(&self, text: &QString) -> bool {
         sheet::is_chord_token(&text.to_string())
+    }
+
+    pub fn parse_song(&self, text: &QString) -> QString {
+        QString::from(araracypher_core::song::parse_json(&text.to_string()).as_str())
+    }
+
+    pub fn read_text_file(&self, path: &QString) -> QString {
+        match std::fs::read(path.to_string()) {
+            // Arquivos antigos podem estar em Latin-1; o que não for UTF-8 vira "?".
+            Ok(bytes) => QString::from(String::from_utf8_lossy(&bytes).as_ref()),
+            Err(_) => QString::default(),
+        }
+    }
+
+    pub fn read_page(&self, html: &QString) -> QString {
+        QString::from(araracypher_core::web::extract_json(&html.to_string()).as_str())
     }
 }
 

@@ -113,16 +113,75 @@ Rectangle {
     }
 
     function readPaste(replace) {
-        var parts = JSON.parse(Library.parseSheet(pasteArea.text))
-        if (parts.length === 0) {
-            message = "Não achei acordes nem tablatura nesse texto."
-            return
+        var link = pasteArea.text.trim()
+        if (/^https?:\/\/\S+$/i.test(link)) { readLink(link, replace); return }
+        if (applySong(JSON.parse(Library.parseSong(pasteArea.text)), replace, ""))
+            pasteArea.text = ""
+    }
+
+    // Põe na música o que foi lido (texto, arquivo ou link). Com "substituir",
+    // troca partes, batidas e dados; senão, acrescenta as partes no fim.
+    function applySong(song, replace, label) {
+        if (!song.sections || song.sections.length === 0) {
+            message = "Não achei acordes nem tablatura" + (label ? " em " + label : " nesse texto") + "."
+            return false
         }
-        if (replace) draft.sections = parts
-        else draft.sections = draft.sections.concat(parts)
-        message = parts.length === 1 ? "Li 1 parte." : "Li " + parts.length + " partes."
-        pasteArea.text = ""
+        var take = function (k) { return song[k] && (replace || !draft[k]) }
+        if (take("title")) draft.title = song.title
+        if (take("artist")) draft.artist = song.artist
+        if (song.key && replace) draft.key = song.key
+        if (song.capo && replace) draft.capo = song.capo
+        if (song.bpm && (replace || !draft.bpm)) draft.bpm = song.bpm
+        var parts = song.sections
+        if (song.strums && song.strums.length > 0) {
+            var offset = replace ? 0 : draft.strums.length
+            draft.strums = replace ? song.strums : draft.strums.concat(song.strums)
+            for (var i = 0; i < parts.length; ++i)
+                if (parts[i].strum !== undefined) parts[i].strum += offset
+        }
+        for (var k in song.voicings) if (replace || !draft.voicings[k]) draft.voicings[k] = song.voicings[k]
+        for (var j = 0; j < parts.length; ++j) parts[j]._open = parts.length <= 2
+        draft.sections = replace ? parts : draft.sections.concat(parts)
+        var extras = []
+        if (song.strums && song.strums.length) extras.push(song.strums.length === 1 ? "1 batida" : song.strums.length + " batidas")
+        if (song.bpm) extras.push(song.bpm + " BPM")
+        var nv = Object.keys(song.voicings || {}).length
+        if (nv) extras.push(nv === 1 ? "1 forma de acorde" : nv + " formas de acorde")
+        message = "Li " + (parts.length === 1 ? "1 parte" : parts.length + " partes")
+                + (extras.length ? ", " + extras.join(", ") : "")
+                + (song.title ? " de " + song.title : "") + ". Confira e toque em Salvar."
+        pasteFold.expanded = false
         bump()
+        return true
+    }
+
+    // Link colado: baixa a página (como o navegador faria), tira a cifra e
+    // preenche a música. A letra fica de fora; nada sai do computador.
+    function readLink(url, replace) {
+        message = "Abrindo o link..."
+        var xhr = new XMLHttpRequest()
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState !== XMLHttpRequest.DONE) return
+            if (xhr.status < 200 || xhr.status >= 300 || !xhr.responseText) {
+                page.message = "Não consegui abrir o link" + (xhr.status ? " (erro " + xhr.status + ")" : "")
+                        + ". Veja se o endereço está certo e se há internet. Se o site não deixar, copie o texto da cifra e cole aqui."
+                return
+            }
+            var p = JSON.parse(Library.readPage(xhr.responseText))
+            var song = JSON.parse(Library.parseSong(p.text || ""))
+            // O que a página diz fora da cifra vale mais que o palpite do texto.
+            if (p.title) song.title = p.title
+            if (p.artist) song.artist = p.artist
+            if (p.key) song.key = p.key
+            if (p.capo) song.capo = p.capo
+            if (p.bpm && !song.bpm) song.bpm = p.bpm
+            if (page.applySong(song, replace, "nessa página")) {
+                if (!page.draft.source) page.draft.source = url
+                pasteArea.text = ""
+            }
+        }
+        xhr.open("GET", url)
+        xhr.send()
     }
 
     // Lê o texto de um print (OCR no próprio computador) e põe no campo de
@@ -130,9 +189,22 @@ Rectangle {
     property string pendingImage: ""
     function readImage(url) {
         var path = decodeURIComponent(String(url).replace(/^file:\/\//, ""))
+        if (/\.(txt|text|cho|crd|pro|chopro)$/i.test(path)) { readTextFile(path); return }
         pendingImage = path
         message = "Lendo o print..."
         ocrTimer.start()
+    }
+    // Arquivo .txt de cifra: lê direto (numa música nova, já preenche tudo).
+    function readTextFile(path) {
+        var text = Library.readTextFile(path)
+        if (!text) { message = "Não consegui abrir o arquivo."; return }
+        var empty = draft.sections.every(function (s) { return s.chords.length === 0 && !s.tab })
+        if (empty) {
+            applySong(JSON.parse(Library.parseSong(text)), true, "nesse arquivo")
+        } else {
+            pasteArea.text = text
+            message = "Abri o arquivo. Confira o texto e toque em Ler e substituir ou Ler e acrescentar."
+        }
     }
     Timer {
         id: ocrTimer
@@ -149,8 +221,9 @@ Rectangle {
     }
     FileDialog {
         id: imageDialog
-        title: "Escolha o print da cifra ou da tab"
-        nameFilters: ["Imagens (*.png *.jpg *.jpeg *.webp *.bmp)"]
+        title: "Escolha o print ou o arquivo da cifra"
+        nameFilters: ["Prints e arquivos de cifra (*.png *.jpg *.jpeg *.webp *.bmp *.txt *.cho *.pro)",
+                      "Imagens (*.png *.jpg *.jpeg *.webp *.bmp)", "Texto (*.txt *.cho *.pro)"]
         onAccepted: page.readImage(selectedFile)
     }
 
@@ -313,6 +386,20 @@ Rectangle {
                                     iconName: "add"
                                     onClicked: { page.draft.capo = Math.min(12, (page.draft.capo || 0) + 1); page.bump() }
                                 }
+                                Text {
+                                    text: "BPM"
+                                    color: Theme.text
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSize
+                                }
+                                AppTextField {
+                                    Layout.preferredWidth: 64
+                                    mono: true
+                                    placeholderText: "—"
+                                    inputMethodHints: Qt.ImhDigitsOnly
+                                    text: page.rev, page.draft && page.draft.bpm ? String(page.draft.bpm) : ""
+                                    onTextEdited: { var n = parseInt(text); if (n > 0) page.draft.bpm = n; else delete page.draft.bpm }
+                                }
                             }
                             AppTextField {
                                 Layout.fillWidth: true
@@ -335,7 +422,7 @@ Rectangle {
                         Text {
                             width: parent.width
                             wrapMode: Text.WordWrap
-                            text: "Cole uma cifra ou tablatura copiada de um site, ou abra um print (também dá para arrastar a imagem para cá). O app pega as partes ([Intro], [Refrão]...), os acordes, as repetições (2x) e as linhas de tab. A letra fica de fora."
+                            text: "Cole o link de uma cifra, o texto copiado de um site ou uma tablatura, ou abra um print (também dá para arrastar a imagem para cá). O app pega as partes ([Intro], [Refrão]...), os acordes, as repetições (2x) e as linhas de tab. A letra fica de fora."
                             color: Theme.textDim
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSize - 1
@@ -349,13 +436,13 @@ Rectangle {
                             id: pasteArea
                             width: parent.width
                             height: 140
-                            placeholderText: "[Intro] Am  F  C  G\n\n[Refrão]\nC        G\n..."
+                            placeholderText: "https://... (link da cifra)\n\nou o texto:\n[Intro] Am  F  C  G\n\n[Refrão]\nC        G\n..."
                         }
                         Flow {
                             width: parent.width
                             spacing: 8
                             AppButton {
-                                text: "Abrir print..."
+                                text: "Abrir print ou arquivo..."
                                 onClicked: imageDialog.open()
                             }
                             AppButton {

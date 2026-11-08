@@ -21,6 +21,9 @@ pub struct Section {
     /// Tablatura (riff, solo, dedilhado) colada nessa parte, linha por linha.
     #[serde(skip_serializing_if = "String::is_empty")]
     pub tab: String,
+    /// Batida usada (índice em `strums` da música), quando o texto diz.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub strum: Option<usize>,
 }
 
 /// Lê a cifra e devolve as partes com acordes (partes vazias ficam de fora).
@@ -49,6 +52,7 @@ pub fn parse(text: &str) -> Vec<Section> {
                 repeat: 1,
                 chords: Vec::new(),
                 tab: String::new(),
+                strum: None,
             };
             if let Some(line) = chord_line(rest) {
                 sec.chords.extend(line.chords);
@@ -66,6 +70,7 @@ pub fn parse(text: &str) -> Vec<Section> {
                 repeat: 1,
                 chords: Vec::new(),
                 tab: String::new(),
+                strum: None,
             });
             if !sec.tab.is_empty() {
                 sec.tab.push('\n');
@@ -80,6 +85,7 @@ pub fn parse(text: &str) -> Vec<Section> {
                 repeat: 1,
                 chords: Vec::new(),
                 tab: String::new(),
+                strum: None,
             });
             sec.chords.extend(line.chords);
             sec.repeat = sec.repeat.max(line.repeat);
@@ -95,7 +101,7 @@ pub fn parse_json(text: &str) -> String {
 }
 
 /// Cabeçalho de parte: devolve o nome e o resto da linha.
-fn header(line: &str) -> Option<(String, &str)> {
+pub(crate) fn header(line: &str) -> Option<(String, &str)> {
     if let Some(rest) = line.strip_prefix('[') {
         let end = rest.find(']')?;
         let name = rest[..end].trim();
@@ -114,13 +120,13 @@ fn header(line: &str) -> Option<(String, &str)> {
     None
 }
 
-struct ChordLine {
-    chords: Vec<String>,
+pub(crate) struct ChordLine {
+    pub(crate) chords: Vec<String>,
     repeat: u32,
 }
 
 /// Uma linha que só tem acordes (e separadores ou marcas de repetição).
-fn chord_line(line: &str) -> Option<ChordLine> {
+pub(crate) fn chord_line(line: &str) -> Option<ChordLine> {
     let mut chords = Vec::new();
     let mut repeat = 1;
     let cleaned: String = line

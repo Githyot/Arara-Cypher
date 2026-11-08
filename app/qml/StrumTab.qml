@@ -2,9 +2,10 @@ import QtQuick
 import QtQuick.Shapes
 import AraraCypher
 
-// Tab "deitada" de um acorde tocado com uma batida: seis linhas (e B G D A E,
-// do agudo para o grave), uma coluna por tempo da batida, a casa de cada corda
-// tocada naquele tempo, "×" para corda abafada e a direção da palheta em cima.
+// Tab "deitada" de um acorde tocado com uma batida, no estilo das videoaulas:
+// seis linhas (e B G D A E, do agudo para o grave), o número da casa em cima
+// da linha da corda (com um contorno na cor do dedo que aperta), "×" para
+// corda abafada e a direção da palheta embaixo de cada tempo.
 //
 // Códigos da batida (um por tempo):
 //   "B"  baixo: só a corda da fundamental, palheta para baixo
@@ -54,7 +55,7 @@ Item {
     }
 
     implicitWidth: labelW + pattern.length * cellW + 6
-    implicitHeight: rowH * 8 + 4
+    implicitHeight: rowH * 8 + 6
     visible: shape !== null
 
     // ---- Direção da palheta ----
@@ -65,13 +66,13 @@ Item {
             readonly property string code: root.pattern[index]
             x: root.labelW + index * root.cellW
             width: root.cellW
-            y: 0
+            y: root.rowH * 6 + 2
             height: root.rowH
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
             text: code === "" ? "" : code === "U" ? "↑" : "↓"
-            color: code === "X" ? Theme.textDim : Theme.accent
-            font.pixelSize: 15
+            color: code === "X" ? Theme.textDim : Theme.chord
+            font.pixelSize: 17
             font.bold: true
         }
     }
@@ -84,7 +85,7 @@ Item {
             required property int index
             readonly property int string: 5 - index   // linha de cima = Mi agudo
             x: 0
-            y: root.rowH * (index + 1)
+            y: root.rowH * index
             width: root.implicitWidth
             height: root.rowH
 
@@ -128,32 +129,33 @@ Item {
                     width: root.cellW
                     height: root.rowH
 
-                    // Traço da corda.
+                    // Linha da corda (tracejada, como nas aulas).
                     Rectangle {
                         visible: cell.value === null
                         anchors.centerIn: parent
-                        width: 8
-                        height: 2
-                        radius: 1
+                        width: root.cellW - 8
+                        height: 1.5
                         color: Theme.textDim
-                        opacity: 0.55
+                        opacity: 0.6
                     }
-                    // Casa tocada (ou × abafada).
+                    // Casa tocada: o número, com contorno na cor do dedo.
                     Rectangle {
+                        readonly property int finger: cell.value !== null && cell.value !== "x" && root.shape
+                                                      ? (root.shape.fingers[stringRow.string] || 0) : 0
                         visible: cell.value !== null
                         anchors.centerIn: parent
-                        width: 18
-                        height: 18
-                        radius: 9
-                        color: cell.value === "x" ? Qt.rgba(Theme.textDim.r, Theme.textDim.g, Theme.textDim.b, 0.35)
-                             : stringRow.string === (root.shape ? root.shape.root : -1) ? Theme.chord
-                             : Theme.accent
+                        width: 19
+                        height: 19
+                        radius: 9.5
+                        color: "transparent"
+                        border.width: finger > 0 ? 1.6 : 0
+                        border.color: Theme.fingerColors[finger]
                         Text {
                             anchors.centerIn: parent
                             text: cell.value === "x" ? "×" : (cell.value !== null ? cell.value : "")
-                            color: cell.value === "x" ? Theme.text : "#ffffff"
+                            color: cell.value === "x" ? Theme.textDim : Theme.chord
                             font.family: Theme.fontFamily
-                            font.pixelSize: String(cell.value).length > 1 ? 9 : 11
+                            font.pixelSize: String(cell.value).length > 1 ? 11 : 14
                             font.bold: true
                         }
                     }
@@ -169,7 +171,7 @@ Item {
             required property int index
             x: root.labelW + index * root.cellW
             width: root.cellW
-            y: root.rowH * 7
+            y: root.rowH * 7 + 2
             height: root.rowH
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter

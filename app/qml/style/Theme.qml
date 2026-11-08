@@ -64,6 +64,13 @@ QtObject {
     readonly property color success: apple ? (dark ? "#30d158" : "#34c759")
                                            : (dark ? "#8ff0a4" : "#2ec27e")
     // Acordes destacados na cifra (usado a partir do passo 2).
+    // Cor de cada dedo da mão esquerda (1 indicador ... 4 mínimo), usada no
+    // contorno dos números da tab e nos diagramas.
+    readonly property var fingerColors: ["transparent",
+        dark ? "#62a0ea" : "#1c71d8",   // 1 indicador: azul
+        dark ? "#57e389" : "#26a269",   // 2 médio: verde
+        dark ? "#f8e45c" : "#c88800",   // 3 anelar: amarelo
+        dark ? "#dc8add" : "#9141ac"]   // 4 mínimo: roxo
     readonly property color chord: apple ? (dark ? "#ff9f0a" : "#c93400")
                                          : (dark ? "#ffa348" : "#c64600")
 

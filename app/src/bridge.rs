@@ -35,6 +35,11 @@ pub mod qobject {
         #[cxx_name = "parseTab"]
         fn parse_tab(&self, text: &QString) -> QString;
 
+        /// Tab em blocos para a visualização de aula (acordes em cima, setas embaixo).
+        #[qinvokable]
+        #[cxx_name = "lessonTab"]
+        fn lesson_tab(&self, text: &QString) -> QString;
+
         /// Arquivo WAV do "tic" do metrônomo (forte no primeiro tempo), como URL.
         #[qinvokable]
         #[cxx_name = "clickSound"]
@@ -135,6 +140,10 @@ impl qobject::Music {
 
     pub fn parse_tab(&self, text: &QString) -> QString {
         QString::from(tab::parse_json(&text.to_string()).as_str())
+    }
+
+    pub fn lesson_tab(&self, text: &QString) -> QString {
+        QString::from(tab::lesson_json(&text.to_string()).as_str())
     }
 
     pub fn click_sound(&self, accent: bool) -> QString {

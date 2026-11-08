@@ -99,7 +99,9 @@ Rectangle {
         metro.beat = -1
         metro.running = true
     }
-    property string viewMode: "tab"   // "names" | "diagram" | "big" | "tab" | "score"
+    property string viewMode: "tab"   // "names" | "diagram" | "big" | "tab" | "score" | "lesson"
+    // Na aula, as partes sem tab aparecem como na visualização Tab.
+    readonly property string chordMode: viewMode === "lesson" ? "tab" : viewMode
     property bool fullScore: false     // partitura da música inteira, em linhas
     readonly property bool showFullScore: viewMode === "score" && fullScore
     readonly property real zoom: Theme.chordZoom
@@ -285,7 +287,8 @@ Rectangle {
                                     { value: "diagram", label: "Braço" },
                                     { value: "big", label: "Detalhado" },
                                     { value: "tab", label: "Tab" },
-                                    { value: "score", label: "Partitura" }]
+                                    { value: "score", label: "Partitura" },
+                                    { value: "lesson", label: "Aula" }]
                             current: page.viewMode
                             onActivated: (v) => page.viewMode = v
                         }
@@ -566,10 +569,22 @@ Rectangle {
                             Card {
                                 width: parent.width
                                 TabText {
-                                    visible: prefs.showTabs && !!section.modelData.tab && page.viewMode !== "tab" && page.viewMode !== "score"
+                                    visible: prefs.showTabs && !!section.modelData.tab && ["tab", "score", "lesson"].indexOf(page.viewMode) < 0
                                     width: parent.width
                                     tab: section.modelData.tab || ""
                                     zoom: page.zoom
+                                }
+                                LessonTab {
+                                    visible: prefs.showTabs && !!section.modelData.tab && page.viewMode === "lesson"
+                                    width: parent.width
+                                    height: implicitHeight
+                                    tab: visible ? section.modelData.tab : ""
+                                    song: page.song
+                                    semitones: page.shift
+                                    capo: page.capo
+                                    bpm: section.strum && section.strum.bpm ? section.strum.bpm : page.songBpm
+                                    zoom: page.zoom
+                                    onBeat: (strong) => (strong ? ticForte : ticFraco).play()
                                 }
                                 TabScore {
                                     visible: prefs.showTabs && !!section.modelData.tab && (page.viewMode === "tab" || page.viewMode === "score")
@@ -591,10 +606,10 @@ Rectangle {
                                             readonly property string chordName: Examples.chordName(modelData)
                                             readonly property var voicing: Examples.voicing(page.song, modelData)
                                             readonly property real zm: page.zoom
-                                            readonly property bool diag: page.viewMode === "diagram" && diagram.visible
-                                            readonly property bool tab: page.viewMode === "tab" && strumTab.visible
-                                            readonly property bool big: page.viewMode === "big" && bigDiagram.visible
-                                            readonly property bool score: page.viewMode === "score" && notation.visible
+                                            readonly property bool diag: page.chordMode === "diagram" && diagram.visible
+                                            readonly property bool tab: page.chordMode === "tab" && strumTab.visible
+                                            readonly property bool big: page.chordMode === "big" && bigDiagram.visible
+                                            readonly property bool score: page.chordMode === "score" && notation.visible
                                             readonly property real contentW: diag ? diagram.implicitWidth * zm : tab ? strumTab.implicitWidth * zm
                                                                            : big ? bigDiagram.implicitWidth * zm
                                                                            : score ? notation.implicitWidth : 0
@@ -619,7 +634,7 @@ Rectangle {
                                                 id: diagram
                                                 scale: chordBox.zm
                                                 transformOrigin: Item.Top
-                                                visible: page.viewMode === "diagram" && shape !== null
+                                                visible: page.chordMode === "diagram" && shape !== null
                                                 chord: chordBox.chordName
                                                 voicing: chordBox.voicing
                                                 semitones: page.shift
@@ -632,7 +647,7 @@ Rectangle {
                                                 id: bigDiagram
                                                 scale: chordBox.zm
                                                 transformOrigin: Item.Top
-                                                visible: page.viewMode === "big" && shape !== null
+                                                visible: page.chordMode === "big" && shape !== null
                                                 chord: chordBox.chordName
                                                 voicing: chordBox.voicing
                                                 semitones: page.shift
@@ -644,7 +659,7 @@ Rectangle {
                                             NotationView {
                                                 id: notation
                                                 zoom: chordBox.zm
-                                                visible: page.viewMode === "score" && shape !== null
+                                                visible: page.chordMode === "score" && shape !== null
                                                 width: implicitWidth
                                                 height: implicitHeight
                                                 chord: chordBox.chordName
@@ -659,7 +674,7 @@ Rectangle {
                                                 id: strumTab
                                                 scale: chordBox.zm
                                                 transformOrigin: Item.Top
-                                                visible: page.viewMode === "tab" && shape !== null
+                                                visible: page.chordMode === "tab" && shape !== null
                                                 chord: chordBox.chordName
                                                 voicing: chordBox.voicing
                                                 semitones: page.shift

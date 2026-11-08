@@ -176,6 +176,185 @@ fn flush(block: &mut Vec<(Option<char>, &str)>, out: &mut Vec<TabEvent>) {
     block.clear();
 }
 
+/// Um bloco da tab para a visualização de aula: notas com a coluna onde
+/// aparecem, o acorde escrito em cima e a seta de batida embaixo de cada nota.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct System {
+    /// Largura do bloco, em colunas de texto.
+    pub width: usize,
+    pub chords: Vec<LessonChord>,
+    pub events: Vec<LessonEvent>,
+    /// Colunas com barra de compasso no meio da linha.
+    pub bars: Vec<usize>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct LessonChord {
+    pub col: usize,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct LessonEvent {
+    pub col: usize,
+    pub notes: Vec<TabNote>,
+    /// "D" (para baixo), "U" (para cima) ou vazio.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub arrow: String,
+}
+
+pub fn lesson(text: &str) -> Vec<System> {
+    let mut out = Vec::new();
+    let mut block: Vec<&str> = Vec::new();
+    for line in text.lines().chain(std::iter::once("")) {
+        if line.trim().is_empty() {
+            if let Some(sys) = lesson_block(&block) {
+                out.push(sys);
+            }
+            block.clear();
+        } else {
+            block.push(line);
+        }
+    }
+    out
+}
+
+pub fn lesson_json(text: &str) -> String {
+    serde_json::to_string(&lesson(text)).unwrap_or_else(|_| "[]".into())
+}
+
+fn lesson_block(block: &[&str]) -> Option<System> {
+    let first_tab = block.iter().position(|l| split_line(l).is_some())?;
+    let tab_lines: Vec<(Option<char>, &str)> = block.iter().filter_map(|l| split_line(l)).collect();
+    // Onde começa o corpo da tab ("E|" = 2 colunas), para alinhar acordes e setas.
+    let offset = block[first_tab].trim_start().find('|')?
+        + 1
+        + (block[first_tab].len() - block[first_tab].trim_start().len());
+    let lines = tab_lines.len().min(6);
+    let width = tab_lines
+        .iter()
+        .map(|(_, b)| b.chars().count())
+        .max()
+        .unwrap_or(0);
+    let mut columns: Vec<Vec<TabNote>> = vec![Vec::new(); width];
+    let mut bars = Vec::new();
+    for (i, (letter, body)) in tab_lines.iter().take(6).enumerate() {
+        let Some(string) = string_index(*letter, i, lines) else {
+            continue;
+        };
+        let chars: Vec<char> = body.chars().collect();
+        let mut c = 0;
+        let mut tech = String::new();
+        while c < chars.len() {
+            let ch = chars[c];
+            if ch.is_ascii_digit() {
+                let start = c;
+                let mut n = 0u32;
+                while c < chars.len() && chars[c].is_ascii_digit() && c - start < 2 {
+                    n = n * 10 + chars[c].to_digit(10).unwrap();
+                    c += 1;
+                }
+                if n <= 24 {
+                    columns[start].push(TabNote {
+                        string,
+                        fret: n as u8,
+                        tech: std::mem::take(&mut tech),
+                    });
+                }
+                continue;
+            }
+            match ch {
+                '|' if c + 1 < chars.len() && c > 0 && !bars.contains(&c) => bars.push(c),
+                'h' | 'p' | '/' | '\\' | 'b' | '~' => tech = ch.to_string(),
+                _ => {}
+            }
+            c += 1;
+        }
+    }
+    // Notas de duas casas em cordas diferentes que começam uma coluna depois
+    // ("12" em cima de "3") ficam no mesmo evento.
+    let mut events: Vec<LessonEvent> = Vec::new();
+    for (col, notes) in columns.into_iter().enumerate() {
+        if notes.is_empty() {
+            continue;
+        }
+        match events.last_mut() {
+            Some(last)
+                if col == last.col + 1
+                    && !notes
+                        .iter()
+                        .any(|n| last.notes.iter().any(|m| m.string == n.string)) =>
+            {
+                last.notes.extend(notes);
+            }
+            _ => events.push(LessonEvent {
+                col,
+                notes,
+                arrow: String::new(),
+            }),
+        }
+    }
+    for e in &mut events {
+        e.notes.sort_by_key(|n| n.string);
+    }
+    bars.sort();
+
+    let body_col = |i: usize| i.checked_sub(offset);
+    let mut chords = Vec::new();
+    for line in &block[..first_tab] {
+        if crate::sheet::chord_line(line.trim()).is_none() {
+            continue;
+        }
+        let chars: Vec<char> = line.chars().collect();
+        let mut i = 0;
+        while i < chars.len() {
+            if chars[i].is_whitespace() {
+                i += 1;
+                continue;
+            }
+            let start = i;
+            while i < chars.len() && !chars[i].is_whitespace() {
+                i += 1;
+            }
+            let word: String = chars[start..i].iter().collect();
+            if crate::sheet::is_chord_token(&word) {
+                chords.push(LessonChord {
+                    col: body_col(start).unwrap_or(0),
+                    name: word,
+                });
+            }
+        }
+    }
+    let last_tab = block.iter().rposition(|l| split_line(l).is_some())?;
+    for line in &block[last_tab + 1..] {
+        if !crate::sheet::is_arrow_line(line) {
+            continue;
+        }
+        for (i, ch) in line.chars().enumerate() {
+            let arrow = match ch {
+                '↓' | '⇣' => "D",
+                '↑' | '⇡' => "U",
+                _ => continue,
+            };
+            let Some(col) = body_col(i) else { continue };
+            // A nota mais próxima (até 3 colunas) que ainda não tem seta.
+            if let Some(e) = events
+                .iter_mut()
+                .filter(|e| e.arrow.is_empty() && e.col.abs_diff(col) <= 3)
+                .min_by_key(|e| e.col.abs_diff(col))
+            {
+                e.arrow = arrow.into();
+            }
+        }
+    }
+    Some(System {
+        width,
+        chords,
+        events,
+        bars,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -207,6 +386,40 @@ E|-----------------------|";
             frets(&ev),
             ["1:8", "1:8", "2:6", "3:8", "3:6", "3:5", "2:8", "2:/10"]
         );
+    }
+
+    #[test]
+    fn lesson_blocks_with_chords_and_arrows() {
+        let t = concat!(
+            "   Em7(9)     D\n",
+            "E|------------|\n",
+            "B|------------|\n",
+            "G|----12------|\n",
+            "D|----13------|\n",
+            "A|------------|\n",
+            "E|--0-----11--|\n",
+            "    ↓ ↑   ↓\n",
+            "\n",
+            "   Bm\n",
+            "E|--2--|"
+        );
+        let l = lesson(t);
+        assert_eq!(l.len(), 2);
+        let a = &l[0];
+        assert_eq!(
+            a.chords[0],
+            LessonChord {
+                col: 1,
+                name: "Em7(9)".into()
+            }
+        );
+        assert_eq!(a.chords[1].name, "D");
+        assert_eq!(a.events.len(), 3);
+        assert_eq!((a.events[0].col, a.events[0].arrow.as_str()), (2, "D"));
+        assert_eq!(a.events[1].notes.len(), 2);
+        assert_eq!(a.events[1].arrow, "U");
+        assert_eq!(a.events[2].arrow, "D");
+        assert_eq!(l[1].events[0].notes[0].fret, 2);
     }
 
     #[test]

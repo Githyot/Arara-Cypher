@@ -11,6 +11,7 @@ fn main() {
         "qml/SongPage.qml",
         "qml/StrumTab.qml",
         "qml/TabScore.qml",
+        "qml/LessonTab.qml",
         "qml/TabText.qml",
         "qml/AppButton.qml",
         "qml/AppScrollBar.qml",

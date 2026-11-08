@@ -39,7 +39,8 @@ pub fn parse(text: &str) -> Vec<Section> {
         }
     };
 
-    for raw in text.lines() {
+    let lines: Vec<&str> = text.lines().collect();
+    for (idx, raw) in lines.iter().enumerate() {
         let line = raw.trim();
         if line.is_empty() {
             continue;
@@ -64,7 +65,14 @@ pub fn parse(text: &str) -> Vec<Section> {
             continue;
         }
 
-        if is_tab_line(line) {
+        let prev_is_tab = idx > 0 && is_tab_line(lines[idx - 1].trim());
+        let next_is_tab = lines.get(idx + 1).is_some_and(|l| is_tab_line(l.trim()));
+        // Setas de batida logo embaixo da tab: ficam com a tab (com os espaços,
+        // porque a coluna diz em que nota cai cada seta).
+        let keep_raw = (is_tab_line(line))
+            || (prev_is_tab && is_arrow_line(line))
+            || (next_is_tab && chord_line(line).is_some());
+        if keep_raw {
             let sec = current.get_or_insert_with(|| Section {
                 name: format!("Parte {}", sections.len() + 1),
                 repeat: 1,
@@ -73,9 +81,25 @@ pub fn parse(text: &str) -> Vec<Section> {
                 strum: None,
             });
             if !sec.tab.is_empty() {
+                // Linha em branco entre um bloco e outro (acordes + tab + setas).
+                let starts_block = next_is_tab && !is_tab_line(line);
                 sec.tab.push('\n');
+                if starts_block {
+                    sec.tab.push('\n');
+                }
             }
-            sec.tab.push_str(line);
+            if is_tab_line(line) {
+                sec.tab.push_str(line);
+            } else {
+                // Acordes e setas mantêm o recuo, alinhados com a tab.
+                sec.tab.push_str(raw.trim_end());
+            }
+            if !is_tab_line(line) && !is_arrow_line(line) {
+                if let Some(cl) = chord_line(line) {
+                    sec.chords.extend(cl.chords);
+                    sec.repeat = sec.repeat.max(cl.repeat);
+                }
+            }
             continue;
         }
 
@@ -175,8 +199,16 @@ fn split_glued(token: &str) -> Option<(&str, &str)> {
         .find(|(a, b)| !a.ends_with('/') && is_chord_token(a) && is_chord_token(b))
 }
 
+/// Linha só com setas de batida (↓ ↑) e x de abafado.
+pub(crate) fn is_arrow_line(line: &str) -> bool {
+    line.chars().any(|c| matches!(c, '↓' | '↑' | '⇣' | '⇡'))
+        && line.chars().all(|c| {
+            c.is_whitespace() || matches!(c, '↓' | '↑' | '⇣' | '⇡' | 'x' | 'X' | '✕' | '×')
+        })
+}
+
 /// Linha de tablatura: "E|--3--", "e |-0-", "B|---|".
-fn is_tab_line(line: &str) -> bool {
+pub(crate) fn is_tab_line(line: &str) -> bool {
     let mut chars = line.chars();
     let Some(first) = chars.next() else {
         return false;
@@ -274,6 +306,20 @@ Eu canto aqui
         assert_eq!(s[2].name, "Refrão");
         assert_eq!(s[2].chords, ["C", "G", "D", "Em"]);
         assert_eq!(s[1].tab, "E|-----3-----|\nB|---0---0---|");
+    }
+
+    #[test]
+    fn keeps_chords_and_arrows_around_a_tab() {
+        let text = "[Dedilhado]\nParte 1 de 2\n   Em      D\nE|--0--|\nB|-----|\n    ↓  ↑\n\n   Bm\nE|--2--|\n";
+        let s = parse(text);
+        assert_eq!(s.len(), 1);
+        assert_eq!(s[0].chords, ["Em", "D", "Bm"]);
+        assert_eq!(
+            s[0].tab,
+            "   Em      D\nE|--0--|\nB|-----|\n    ↓  ↑\n\n   Bm\nE|--2--|"
+        );
+        // A leitura da tab ignora as linhas de acordes e setas.
+        assert_eq!(crate::tab::parse(&s[0].tab).len(), 3);
     }
 
     #[test]

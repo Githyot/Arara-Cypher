@@ -6,7 +6,8 @@
 //! - blocos de batida: `[Refrão - Parte 1] 120 bpm`, uma linha de setas
 //!   (↓ ↑, com `x` em cima para abafar) e a contagem `1 . 2 . 3 . 4`;
 //! - a lista de formas no fim: `Fm = 0 2 2 0 0 0` (com capotraste, os nomes
-//!   da lista são o som real e as partes usam o nome da forma);
+//!   da lista são o som real e as partes usam o nome da forma, e as casas
+//!   contam a partir do capo: o app soma o capo para ficar igual à tab);
 //! - partes que repetem a mesma sequência viram "N×".
 
 use crate::chord::transpose_name;
@@ -155,11 +156,19 @@ pub fn parse(text: &str) -> Song {
                 .iter()
                 .find(|(n, _)| same_chord(&transpose_name(n, -(song.capo as i32)), token))
             {
+                // A lista conta as casas a partir do capotraste; o app (como a
+                // tab e o desenho com "11ª") usa a casa de verdade no braço.
+                let mut abs = *frets;
+                for f in abs.iter_mut() {
+                    if *f > 0 {
+                        *f += song.capo as i8;
+                    }
+                }
                 song.voicings.insert(
                     token.clone(),
                     Voicing {
-                        frets: *frets,
-                        fingers: fingers_for(frets),
+                        frets: abs,
+                        fingers: fingers_for(&abs),
                     },
                 );
             }
@@ -476,10 +485,11 @@ F = 1 3 3 2 1 1
         assert_eq!(s.sections[2].strum, Some(0));
         assert_eq!(s.sections[0].strum, None);
         // Gm com capo 1 é a forma de F#m.
-        assert_eq!(s.voicings["F#m"].frets, [2, 4, 4, 2, 2, 2]);
+        // Casas da lista + capo = casas de verdade (as mesmas da tab).
+        assert_eq!(s.voicings["F#m"].frets, [3, 5, 5, 3, 3, 3]);
         assert_eq!(s.voicings["F#m"].fingers, [1, 3, 4, 1, 1, 1]);
-        assert_eq!(s.voicings["D"].frets, [-1, -1, 1, 3, 4, 3]);
-        assert_eq!(s.voicings["E"].frets, [1, 3, 3, 2, 1, 1]);
+        assert_eq!(s.voicings["D"].frets, [-1, -1, 2, 4, 5, 4]);
+        assert_eq!(s.voicings["E"].frets, [2, 4, 4, 3, 2, 2]);
     }
 
     #[test]

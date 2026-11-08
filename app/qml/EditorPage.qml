@@ -154,12 +154,27 @@ Rectangle {
         onAccepted: page.readImage(selectedFile)
     }
 
-    function moveSection(i, d) {
-        var j = i + d
-        if (j < 0 || j >= draft.sections.length) return
-        var tmp = draft.sections[i]
-        draft.sections[i] = draft.sections[j]
-        draft.sections[j] = tmp
+    // Arrastar partes pela alça: onde a parte arrastada vai entrar
+    // (índice da parte que fica logo depois dela, ou o total para o fim).
+    property int dropBefore: -1
+    function dropSlot(from, centerY) {
+        var n = draft.sections.length
+        for (var j = 0; j < n; ++j) {
+            if (j === from) continue
+            var it = partsRepeater.itemAt(j)
+            if (it && centerY < it.y + it.height / 2) return (j === from + 1) ? -1 : j
+        }
+        return from === n - 1 ? -1 : n
+    }
+    function finishDrag(row) {
+        var from = row.index
+        var to = dropBefore
+        row.dragging = false
+        row.dragDy = 0
+        dropBefore = -1
+        if (to < 0 || to === from || to === from + 1) return
+        var s = draft.sections.splice(from, 1)[0]
+        draft.sections.splice(to > from ? to - 1 : to, 0, s)
         bump()
     }
 
@@ -502,142 +517,202 @@ Rectangle {
                         }
                     }
                     Repeater {
+                        id: partsRepeater
                         model: page.rev, page.draft ? page.draft.sections : []
-                        Card {
-                            id: secCard
+                        Item {
+                            id: partRow
                             required property var modelData
                             required property int index
-                            property bool showTab: !!modelData.tab
-                            property bool showBoard: false
-                            property var history: []
+                            property real dragDy: 0
+                            property bool dragging: false
                             width: body.width
-                            padding: partFold.expanded ? 14 : 4
-                            Collapsible {
-                                id: partFold
-                                width: parent.width
-                                title: secCard.modelData.name || "Parte sem nome"
-                                badge: (secCard.modelData.repeat || 1) > 1 ? secCard.modelData.repeat + "×" : ""
-                                summary: secCard.modelData.chords.join("  ") + (secCard.modelData.tab ? (secCard.modelData.chords.length ? "  · " : "") + "tab" : "")
-                                expanded: !!secCard.modelData._open
-                                onExpandedChanged: secCard.modelData._open = expanded
+                            height: secCard.height
+                            z: dragging ? 10 : 0
+                            opacity: dragging ? 0.85 : 1
+                            transform: Translate { y: partRow.dragDy }
 
-                                RowLayout {
-                                    width: parent.width
-                                    spacing: 6
-                                    AppTextField {
-                                        Layout.fillWidth: true
-                                        text: secCard.modelData.name
-                                        placeholderText: "Nome da parte (Intro, Refrão...)"
-                                        onTextEdited: secCard.modelData.name = text
-                                    }
-                                    AppButton {
-                                        iconName: "remove"
-                                        onClicked: { secCard.modelData.repeat = Math.max(1, (secCard.modelData.repeat || 1) - 1); page.bump() }
-                                    }
-                                    Text {
-                                        text: (secCard.modelData.repeat || 1) + "×"
-                                        color: Theme.accent
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSize
-                                        font.weight: Font.Bold
-                                    }
-                                    AppButton {
-                                        iconName: "add"
-                                        onClicked: { secCard.modelData.repeat = (secCard.modelData.repeat || 1) + 1; page.bump() }
+                            // Linha que mostra onde a parte vai entrar.
+                            Rectangle {
+                                visible: page.dropBefore === partRow.index || (page.dropBefore === page.draft.sections.length && partRow.index === page.draft.sections.length - 1)
+                                x: handle.width + 6
+                                width: parent.width - x
+                                height: 3
+                                radius: 1.5
+                                y: page.dropBefore === partRow.index ? -6 : parent.height + 3
+                                color: Theme.accent
+                            }
+
+                            // Alça de arrastar, do lado de fora do cartão.
+                            Rectangle {
+                                id: handle
+                                width: 26
+                                height: Math.min(secCard.height, 40)
+                                radius: Theme.radiusSmall
+                                color: handleMouse.containsMouse || partRow.dragging
+                                       ? Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.08) : "transparent"
+                                Column {
+                                    anchors.centerIn: parent
+                                    spacing: 3
+                                    Repeater {
+                                        model: 3
+                                        Rectangle { width: 14; height: 2; radius: 1; color: Theme.textDim }
                                     }
                                 }
-
-                                AppTextField {
-                                    id: chordField
-                                    width: parent.width
-                                    mono: true
-                                    placeholderText: "Acordes separados por espaço: Am F C G"
-                                    text: secCard.modelData.chords.join("  ")
-                                    onTextEdited: secCard.modelData.chords = page.chordsOf(text)
-                                    onEditingFinished: page.bump()
-                                    readonly property var bad: page.chordsOf(text).filter(function (c) {
-                                        return !Music.isChord(Examples.chordName(c))
-                                    })
-                                }
-                                Text {
-                                    visible: chordField.bad.length > 0
-                                    width: parent.width
-                                    wrapMode: Text.WordWrap
-                                    text: "Não reconheci: " + chordField.bad.join(", ")
-                                    color: Theme.destructive
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSize - 1
-                                }
-
-                                RowLayout {
-                                    visible: page.draft.strums.length > 1
-                                    width: parent.width
-                                    Text {
-                                        Layout.fillWidth: true
-                                        text: "Batida"
-                                        color: Theme.text
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSize
+                                MouseArea {
+                                    id: handleMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    preventStealing: true
+                                    cursorShape: partRow.dragging ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                                    property real startY: 0
+                                    onPressed: (m) => {
+                                        startY = mapToItem(null, m.x, m.y).y
+                                        partRow.dragging = true
                                     }
-                                    SegmentedControl {
-                                        model: page.draft.strums.map(function (s, i) { return { value: String(i), label: String(i + 1) } })
-                                        current: String(secCard.modelData.strum || 0)
-                                        onActivated: (v) => { secCard.modelData.strum = Number(v); page.bump() }
+                                    onPositionChanged: (m) => {
+                                        if (!partRow.dragging) return
+                                        partRow.dragDy = mapToItem(null, m.x, m.y).y - startY
+                                        page.dropBefore = page.dropSlot(partRow.index, partRow.y + partRow.dragDy + partRow.height / 2)
                                     }
+                                    onReleased: page.finishDrag(partRow)
+                                    onCanceled: page.finishDrag(partRow)
                                 }
-
-                                AppTextArea {
-                                    visible: secCard.showTab
+                            }
+                            Card {
+                                id: secCard
+                                readonly property var modelData: partRow.modelData
+                                readonly property int index: partRow.index
+                                property bool showTab: !!modelData.tab
+                                property bool showBoard: false
+                                property var history: []
+                                x: handle.width + 6
+                            width: parent.width - x
+                                padding: partFold.expanded ? 14 : 4
+                                Collapsible {
+                                    id: partFold
                                     width: parent.width
-                                    height: Math.max(120, contentHeight + 24)
-                                    placeholderText: "e|-----------------|\nB|-----------------|\nG|-----5-----------|\nD|---7-------------|\nA|-----------------|\nE|-----------------|"
-                                    text: secCard.modelData.tab || ""
-                                    onTextChanged: secCard.modelData.tab = text
-                                    id: tabArea
-                                }
-
-                                AppButton {
-                                    visible: secCard.showTab
-                                    text: secCard.showBoard ? "Esconder o braço" : "Digitar no braço"
-                                    onClicked: secCard.showBoard = !secCard.showBoard
-                                }
-                                FretInput {
-                                    visible: secCard.showTab && secCard.showBoard
-                                    width: parent.width
-                                    function push(t) {
-                                        secCard.history.push(tabArea.text)
-                                        tabArea.text = t
-                                    }
-                                    onColumn: (notes) => push(page.tabAppend(tabArea.text, notes))
-                                    onRest: push(page.tabAppend(tabArea.text, []))
-                                    onBar: push(page.tabBar(tabArea.text))
-                                    onUndo: if (secCard.history.length > 0) tabArea.text = secCard.history.pop()
-                                }
-
-                                AppTextField {
-                                    width: parent.width
-                                    placeholderText: "Observação (opcional)"
-                                    text: secCard.modelData.note || ""
-                                    onTextEdited: secCard.modelData.note = text
-                                }
-
-                                Row {
-                                    spacing: 6
-                                    AppButton {
-                                        text: secCard.showTab ? "Sem tab" : "Tab (riff, solo)"
-                                        onClicked: {
-                                            if (secCard.showTab) delete secCard.modelData.tab
-                                            else secCard.modelData.tab = ""
-                                            secCard.showTab = !secCard.showTab
+                                    title: secCard.modelData.name || "Parte sem nome"
+                                    badge: (secCard.modelData.repeat || 1) > 1 ? secCard.modelData.repeat + "×" : ""
+                                    summary: secCard.modelData.chords.join("  ") + (secCard.modelData.tab ? (secCard.modelData.chords.length ? "  · " : "") + "tab" : "")
+                                    expanded: !!secCard.modelData._open
+                                    onExpandedChanged: secCard.modelData._open = expanded
+    
+                                    RowLayout {
+                                        width: parent.width
+                                        spacing: 6
+                                        AppTextField {
+                                            Layout.fillWidth: true
+                                            text: secCard.modelData.name
+                                            placeholderText: "Nome da parte (Intro, Refrão...)"
+                                            onTextEdited: secCard.modelData.name = text
+                                        }
+                                        AppButton {
+                                            iconName: "remove"
+                                            onClicked: { secCard.modelData.repeat = Math.max(1, (secCard.modelData.repeat || 1) - 1); page.bump() }
+                                        }
+                                        Text {
+                                            text: (secCard.modelData.repeat || 1) + "×"
+                                            color: Theme.accent
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontSize
+                                            font.weight: Font.Bold
+                                        }
+                                        AppButton {
+                                            iconName: "add"
+                                            onClicked: { secCard.modelData.repeat = (secCard.modelData.repeat || 1) + 1; page.bump() }
                                         }
                                     }
-                                    AppButton { text: "Subir"; enabled: secCard.index > 0; onClicked: page.moveSection(secCard.index, -1) }
-                                    AppButton { text: "Descer"; enabled: secCard.index < page.draft.sections.length - 1; onClicked: page.moveSection(secCard.index, 1) }
-                                    AppButton {
-                                        text: "Apagar"
-                                        onClicked: { page.draft.sections.splice(secCard.index, 1); page.bump() }
+    
+                                    AppTextField {
+                                        id: chordField
+                                        width: parent.width
+                                        mono: true
+                                        placeholderText: "Acordes separados por espaço: Am F C G"
+                                        text: secCard.modelData.chords.join("  ")
+                                        onTextEdited: secCard.modelData.chords = page.chordsOf(text)
+                                        onEditingFinished: page.bump()
+                                        readonly property var bad: page.chordsOf(text).filter(function (c) {
+                                            return !Music.isChord(Examples.chordName(c))
+                                        })
                                     }
-                            }
+                                    Text {
+                                        visible: chordField.bad.length > 0
+                                        width: parent.width
+                                        wrapMode: Text.WordWrap
+                                        text: "Não reconheci: " + chordField.bad.join(", ")
+                                        color: Theme.destructive
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSize - 1
+                                    }
+    
+                                    RowLayout {
+                                        visible: page.draft.strums.length > 1
+                                        width: parent.width
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: "Batida"
+                                            color: Theme.text
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontSize
+                                        }
+                                        SegmentedControl {
+                                            model: page.draft.strums.map(function (s, i) { return { value: String(i), label: String(i + 1) } })
+                                            current: String(secCard.modelData.strum || 0)
+                                            onActivated: (v) => { secCard.modelData.strum = Number(v); page.bump() }
+                                        }
+                                    }
+    
+                                    AppTextArea {
+                                        visible: secCard.showTab
+                                        width: parent.width
+                                        height: Math.max(120, contentHeight + 24)
+                                        placeholderText: "e|-----------------|\nB|-----------------|\nG|-----5-----------|\nD|---7-------------|\nA|-----------------|\nE|-----------------|"
+                                        text: secCard.modelData.tab || ""
+                                        onTextChanged: secCard.modelData.tab = text
+                                        id: tabArea
+                                    }
+    
+                                    AppButton {
+                                        visible: secCard.showTab
+                                        text: secCard.showBoard ? "Esconder o braço" : "Digitar no braço"
+                                        onClicked: secCard.showBoard = !secCard.showBoard
+                                    }
+                                    FretInput {
+                                        visible: secCard.showTab && secCard.showBoard
+                                        width: parent.width
+                                        function push(t) {
+                                            secCard.history.push(tabArea.text)
+                                            tabArea.text = t
+                                        }
+                                        onColumn: (notes) => push(page.tabAppend(tabArea.text, notes))
+                                        onRest: push(page.tabAppend(tabArea.text, []))
+                                        onBar: push(page.tabBar(tabArea.text))
+                                        onUndo: if (secCard.history.length > 0) tabArea.text = secCard.history.pop()
+                                    }
+    
+                                    AppTextField {
+                                        width: parent.width
+                                        placeholderText: "Observação (opcional)"
+                                        text: secCard.modelData.note || ""
+                                        onTextEdited: secCard.modelData.note = text
+                                    }
+    
+                                    Row {
+                                        spacing: 6
+                                        AppButton {
+                                            text: secCard.showTab ? "Sem tab" : "Tab (riff, solo)"
+                                            onClicked: {
+                                                if (secCard.showTab) delete secCard.modelData.tab
+                                                else secCard.modelData.tab = ""
+                                                secCard.showTab = !secCard.showTab
+                                            }
+                                        }
+                                        AppButton {
+                                            text: "Apagar"
+                                            onClicked: { page.draft.sections.splice(secCard.index, 1); page.bump() }
+                                        }
+                                }
+                                }
                             }
                         }
                     }

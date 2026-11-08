@@ -135,13 +135,14 @@ Item {
         }
     }
 
-    // Embaixo: O soa, X não toca.
+    // Embaixo: O = corda solta, X = não toca; corda presa fica sem marca.
     Repeater {
         model: 6
         Text {
             required property int index
             readonly property bool muted: root.shape && root.shape.frets[index] < 0
-            text: muted ? "X" : "O"
+            readonly property bool open: root.shape && root.shape.frets[index] === 0
+            text: muted ? "X" : open ? "O" : ""
             color: muted ? Theme.destructive : Theme.text
             font.family: Theme.fontFamily
             font.pixelSize: 22

@@ -91,6 +91,11 @@ if(NOT ANDROID)
     set(CPACK_RPM_PACKAGE_REQUIRES "qt6-qtbase, qt6-qtdeclarative, tesseract, tesseract-langpack-por")
     set(CPACK_RPM_PACKAGE_AUTOREQ ON)
     set(CPACK_RPM_FILE_NAME RPM-DEFAULT)
+    # Release sobe a cada build do CI (número da execução), para o
+    # "dnf upgrade" reconhecer o pacote novo sem desinstalar o antigo.
+    set(ARARA_RELEASE "1" CACHE STRING "Release do pacote .rpm")
+    set(CPACK_RPM_PACKAGE_RELEASE "${ARARA_RELEASE}")
+    set(CPACK_RPM_PACKAGE_RELEASE_DIST ON)
     set(CPACK_PACKAGING_INSTALL_PREFIX "/usr")
     include(CPack)
 endif()

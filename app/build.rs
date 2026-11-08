@@ -35,6 +35,7 @@ fn main() {
         "qml/ScoreRow.qml",
         "qml/SectionTitle.qml",
         "qml/SegmentedControl.qml",
+        "qml/MetroSound.qml",
     ];
     let singletons = ["qml/style/Theme.qml", "qml/data/Examples.qml"];
     for f in qml.iter().chain(singletons.iter()) {

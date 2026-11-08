@@ -56,6 +56,9 @@ pub mod qobject {
         #[qinvokable]
         #[cxx_name = "clickSound"]
         fn click_sound(&self, accent: bool) -> QString;
+        #[qinvokable]
+        #[cxx_name = "beatSound"]
+        fn beat_sound(&self, kind: &QString, accent: bool) -> QString;
 
         /// Pontua o jogo de batida: tempos esperados e toques (JSON, em ms).
         #[qinvokable]
@@ -191,6 +194,17 @@ impl qobject::Music {
         let path = std::env::temp_dir().join(format!("araracypher-tic-{name}.wav"));
         let wav = araracypher_core::sound::click_wav(if accent { 1760.0 } else { 1175.0 }, 60);
         match std::fs::write(&path, wav) {
+            Ok(()) => QString::from(format!("file://{}", path.display()).as_str()),
+            Err(_) => QString::default(),
+        }
+    }
+
+    pub fn beat_sound(&self, kind: &QString, accent: bool) -> QString {
+        let kind = kind.to_string();
+        let safe: String = kind.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
+        let name = if accent { "forte" } else { "fraco" };
+        let path = std::env::temp_dir().join(format!("araracypher-{safe}-{name}.wav"));
+        match std::fs::write(&path, araracypher_core::sound::beat_wav(&kind, accent)) {
             Ok(()) => QString::from(format!("file://{}", path.display()).as_str()),
             Err(_) => QString::default(),
         }

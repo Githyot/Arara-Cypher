@@ -136,8 +136,7 @@ Rectangle {
         property real t0: 0
         property int beat: -1
     }
-    SoundEffect { id: ticForte; source: Music.clickSound(true); volume: 0.9 }
-    SoundEffect { id: ticFraco; source: Music.clickSound(false); volume: 0.6 }
+
     Timer {
         interval: 5
         repeat: true
@@ -146,7 +145,7 @@ Rectangle {
             var n = Math.floor((Date.now() - metro.t0) / (60000 / metro.bpm))
             if (n !== metro.beat) {
                 metro.beat = n
-                ;(n % 4 === 0 ? ticForte : ticFraco).play()
+                metroSound.play(n % 4 === 0)
             }
         }
     }
@@ -661,7 +660,7 @@ Rectangle {
                                     capo: page.capo
                                     bpm: section.strum && section.strum.bpm ? section.strum.bpm : page.songBpm
                                     zoom: page.zoom
-                                    onBeat: (strong) => (strong ? ticForte : ticFraco).play()
+                                    onBeat: (strong) => metroSound.play(strong)
                                 }
                                 TabScore {
                                     visible: prefs.showTabs && !!section.modelData.tab && (page.viewMode === "tab" || page.viewMode === "score")
@@ -909,15 +908,23 @@ Rectangle {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.margins: 16
-        width: metroRow.implicitWidth + 24
-        height: metroRow.implicitHeight + 20
+        width: Math.max(metroRow.implicitWidth, metroSound.implicitWidth) + 24
+        height: metroRow.implicitHeight + metroSound.implicitHeight + 28
         radius: Theme.radius
         color: Theme.card
         border.width: 1
         border.color: Theme.border
+        MetroSound {
+            id: metroSound
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 10
+        }
         RowLayout {
             id: metroRow
-            anchors.centerIn: parent
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: parent.top
+            anchors.topMargin: 10
             spacing: 8
             Row {
                 spacing: 5

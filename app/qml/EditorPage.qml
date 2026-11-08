@@ -476,6 +476,8 @@ Rectangle {
                             id: strumCard
                             required property var modelData
                             required property int index
+                            // A batida de verdade no rascunho (modelData é uma cópia).
+                            readonly property var st: page.rev, page.draft.strums[index] || modelData
                             width: body.width
                             RowLayout {
                                 width: parent.width
@@ -487,9 +489,9 @@ Rectangle {
                                 }
                                 AppTextField {
                                     Layout.fillWidth: true
-                                    text: strumCard.modelData.name
+                                    text: strumCard.st.name
                                     placeholderText: "Nome da batida"
-                                    onTextEdited: strumCard.modelData.name = text
+                                    onTextEdited: strumCard.st.name = text
                                 }
                                 AppButton {
                                     visible: page.draft.strums.length > 1
@@ -515,7 +517,7 @@ Rectangle {
                             }
                             StrumSlots {
                                 width: parent.width
-                                strum: strumCard.modelData
+                                strum: strumCard.st
                                 rev: page.rev
                                 onChanged: page.bump()
                             }
@@ -611,7 +613,9 @@ Rectangle {
                             }
                             Card {
                                 id: secCard
-                                readonly property var modelData: partRow.modelData
+                                // A parte de verdade no rascunho (o modelData da Repeater é uma cópia:
+                                // mudar nela não chega no arquivo salvo).
+                                readonly property var modelData: page.rev, page.draft.sections[partRow.index] || partRow.modelData
                                 readonly property int index: partRow.index
                                 property bool showTab: !!modelData.tab
                                 property bool showBoard: true
@@ -623,7 +627,7 @@ Rectangle {
                                     id: partFold
                                     width: parent.width
                                     title: secCard.modelData.name || "Parte sem nome"
-                                    badge: (secCard.modelData.repeat || 1) > 1 ? secCard.modelData.repeat + "×" : ""
+                                    badge: page.rev, (secCard.modelData.repeat || 1) > 1 ? secCard.modelData.repeat + "×" : ""
                                     summary: page.rev, secCard.modelData.chords.join("  ")
                                              + (page.draft.strums.length > 1 && secCard.modelData.chords.length
                                                 ? "  · " + (page.draft.strums[Math.min(secCard.modelData.strum || 0, page.draft.strums.length - 1)].name || "batida") : "")
@@ -645,7 +649,7 @@ Rectangle {
                                             onClicked: { secCard.modelData.repeat = Math.max(1, (secCard.modelData.repeat || 1) - 1); page.bump() }
                                         }
                                         Text {
-                                            text: (secCard.modelData.repeat || 1) + "×"
+                                            text: page.rev, (secCard.modelData.repeat || 1) + "×"
                                             color: Theme.accent
                                             font.family: Theme.fontFamily
                                             font.pixelSize: Theme.fontSize

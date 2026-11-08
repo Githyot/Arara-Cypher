@@ -113,9 +113,8 @@ Rectangle {
     // ---- Metrônomo ----
     property int bpm: 70
     property bool sound: true
-    SoundEffect { id: ticForte; source: Music.clickSound(true); volume: 0.9 }
-    SoundEffect { id: ticFraco; source: Music.clickSound(false); volume: 0.6 }
-    function tic(strong) { if (sound) (strong ? ticForte : ticFraco).play() }
+    MetroSound { id: metroSound; visible: false }
+    function tic(strong) { if (sound) metroSound.play(strong) }
 
     // Relógio comum aos jogos: um Timer rápido que olha a hora de verdade,
     // para o tempo não atrasar com o passar dos compassos.

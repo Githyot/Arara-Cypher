@@ -15,6 +15,9 @@ import AraraCypher
 //             apelido depois de "@" (ex.: "Gm7@2"); o "@..." não aparece na tela.
 //             Acorde sem forma aqui usa a forma calculada pelo app.
 QtObject {
+    // Toques copiados no editor visual da tab (vale entre as partes).
+    property var tabClip: []
+
     // ---- Golpes da batida ----
     // "B" baixo, "D" tudo, "d" acorde sem o baixo, "U" agudas para cima,
     // "X" abafado, "" pausa e, para dedilhado, "P" + cordas ("P03" = cordas 0

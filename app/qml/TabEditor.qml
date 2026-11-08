@@ -18,6 +18,44 @@ Column {
     property int curS: 0
     property int curE: 0
     property int curString: 5          // corda escolhida para o teclado
+    property int selA: -1              // começo da seleção (no mesmo bloco); -1 = só o toque
+    readonly property int selFrom: selA < 0 ? curE : Math.min(selA, curE)
+    readonly property int selTo: selA < 0 ? curE : Math.max(selA, curE)
+    readonly property int selCount: selTo - selFrom + 1
+
+    // ---- Copiar e colar toques ----
+    function copySel() {
+        var s = sys(); if (!s || !s.events.length) return
+        Examples.tabClip = JSON.parse(JSON.stringify(s.events.slice(selFrom, selTo + 1)))
+        rev++
+    }
+    function cutSel() {
+        copySel()
+        var s = sys(); if (!s || !s.events.length) return
+        var from = selFrom, n = selCount
+        s.events.splice(from, n)
+        shift(s, from + n, -n)
+        selA = -1
+        curE = Math.max(0, from - 1)
+        if (s.events.length === 0) { model.splice(curS, 1); curS = Math.max(0, curS - 1); curE = 0 }
+        commit()
+    }
+    function paste() {
+        var clip = Examples.tabClip
+        if (!clip || !clip.length) return
+        if (model.length === 0) {
+            model.push({ chords: [], events: [], bars: [] })
+            curS = 0; curE = -1
+        }
+        var s = model[curS]
+        var at = s.events.length ? selTo + 1 : 0
+        var items = JSON.parse(JSON.stringify(clip))
+        for (var i = 0; i < items.length; ++i) s.events.splice(at + i, 0, items[i])
+        shift(s, at, items.length)
+        selA = at
+        curE = at + items.length - 1
+        commit()
+    }
     property int rev: 0
 
     function reload() {
@@ -85,11 +123,23 @@ Column {
             else if (curS > 0) { curS--; curE = model[curS].events.length - 1 }
         }
         typed = ""
+        selA = -1
         rev++
     }
     focus: true
     Keys.onPressed: (e) => {
-        if (e.key >= Qt.Key_0 && e.key <= Qt.Key_9) {
+        var ctrl = e.modifiers & Qt.ControlModifier
+        if (ctrl && e.key === Qt.Key_C) copySel()
+        else if (ctrl && e.key === Qt.Key_X) cutSel()
+        else if (ctrl && e.key === Qt.Key_V) paste()
+        else if (ctrl && e.key === Qt.Key_A) { selA = 0; curE = sys() ? sys().events.length - 1 : 0; rev++ }
+        else if ((e.modifiers & Qt.ShiftModifier) && (e.key === Qt.Key_Left || e.key === Qt.Key_Right)) {
+            if (selA < 0) selA = curE
+            var s2 = sys()
+            if (s2) curE = Math.max(0, Math.min(s2.events.length - 1, curE + (e.key === Qt.Key_Right ? 1 : -1)))
+            rev++
+        }
+        else if (e.key >= Qt.Key_0 && e.key <= Qt.Key_9) {
             var d = String(e.key - Qt.Key_0)
             typed = typedTimer.running && typed.length === 1 && parseInt(typed + d) <= 24 ? typed + d : d
             typedTimer.restart()
@@ -205,7 +255,7 @@ Column {
     Text {
         width: parent.width
         wrapMode: Text.WordWrap
-        text: "Toque numa coluna para escolher o toque; no braço, toque na casa para pôr, trocar ou tirar a nota. Arraste uma nota para outra corda ou outro toque; arraste o topo da coluna para mudar o toque de lugar. Toque embaixo para pôr a seta.\nTeclado: digite a casa na corda marcada, Delete tira, setas ←→ andam nos toques e ↑↓ nas cordas, + põe um toque depois, − exclui."
+        text: "Toque numa corda de um toque e digite a casa (dois números seguidos = 10, 11...). Delete tira, setas ←→ andam nos toques e ↑↓ nas cordas, + põe um toque depois, − exclui. Arraste uma nota para outra corda ou toque; arraste o topo da coluna para mudar o toque de lugar. Toque embaixo para pôr a seta.\nCopiar e colar: Shift+clique (ou Shift+setas) escolhe vários toques; Ctrl+C copia, Ctrl+X recorta, Ctrl+V cola depois do toque escolhido (vale de uma parte para outra)."
         color: Theme.textDim
         font.family: Theme.fontFamily
         font.pixelSize: Theme.fontSize - 2
@@ -279,6 +329,7 @@ Column {
                             required property var modelData
                             required property int index
                             readonly property bool selected: sysItem.index === root.curS && index === root.curE
+                            readonly property bool inRange: root.rev, sysItem.index === root.curS && index >= root.selFrom && index <= root.selTo
                             x: root.colX(sysItem.index, index)
                             width: root.colW
                             height: root.sysH
@@ -294,7 +345,7 @@ Column {
                                 anchors.fill: parent
                                 anchors.margins: 1
                                 radius: 4
-                                color: col.selected ? Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.22) : "transparent"
+                                color: col.inRange ? Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, col.selected ? 0.3 : 0.16) : "transparent"
                                 border.width: col.selected ? 1.5 : 0
                                 border.color: Theme.accent
                             }
@@ -408,6 +459,9 @@ Column {
                     if (!f) return
                     if (!wasDrag) {
                         root.forceActiveFocus()
+                        if ((m.modifiers & Qt.ShiftModifier) && f.s === root.curS) {
+                            if (root.selA < 0) root.selA = root.curE
+                        } else root.selA = -1
                         root.curS = f.s; root.curE = f.e
                         if (f.string >= 0) root.curString = f.string
                         root.typed = ""
@@ -444,6 +498,13 @@ Column {
             text: root.rev, root.sys() && root.sys().bars.indexOf(root.curE) >= 0 ? "Tirar barra" : "Barra antes"
             onClicked: root.toggleBar()
         }
+        AppButton { text: root.selCount > 1 ? "Copiar " + root.selCount + " toques" : "Copiar"; enabled: !!root.current; onClicked: root.copySel() }
+        AppButton { text: "Recortar"; enabled: !!root.current; onClicked: root.cutSel() }
+        AppButton {
+            text: root.rev, Examples.tabClip.length > 1 ? "Colar " + Examples.tabClip.length + " toques" : "Colar"
+            enabled: root.rev, Examples.tabClip.length > 0
+            onClicked: root.paste()
+        }
         AppButton { text: "Novo bloco"; flat: true; onClicked: root.newBlock() }
     }
     RowLayout {
@@ -464,12 +525,5 @@ Column {
             onEditingFinished: if (text.trim() !== (root.sys() ? root.chordAt(root.sys(), root.curE) : "")) root.setChord(text)
         }
         Item { Layout.fillWidth: true }
-    }
-
-    // ---- Braço com as notas do toque escolhido ----
-    FretInput {
-        width: parent.width
-        marks: root.rev, root.current ? root.current.notes.slice() : []
-        onPicked: (string, fret) => root.pick(string, fret)
     }
 }

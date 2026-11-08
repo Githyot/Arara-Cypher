@@ -60,12 +60,43 @@ pub fn save(dir: &Path, json: &str) -> io::Result<String> {
     fs::create_dir_all(dir)?;
     let text = serde_json::to_string_pretty(&Value::Object(song))
         .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+    // A versão anterior vai para "historico/" (as 10 últimas de cada música),
+    // para dar para voltar se algo der errado.
+    let file = dir.join(format!("{id}.json"));
+    if file.exists() {
+        let _ = backup(dir, &id, &file);
+    }
     // Grava num arquivo temporário e renomeia, para não perder a música se
     // o app fechar no meio.
     let tmp = dir.join(format!(".{id}.json.tmp"));
     fs::write(&tmp, text)?;
     fs::rename(&tmp, dir.join(format!("{id}.json")))?;
     Ok(id)
+}
+
+fn backup(dir: &Path, id: &str, file: &Path) -> io::Result<()> {
+    let hist = dir.join("historico");
+    fs::create_dir_all(&hist)?;
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    fs::copy(file, hist.join(format!("{id}.{stamp}.json")))?;
+    let prefix = format!("{id}.");
+    let mut old: Vec<PathBuf> = fs::read_dir(&hist)?
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| {
+            p.file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.starts_with(&prefix) && n.ends_with(".json"))
+        })
+        .collect();
+    old.sort();
+    while old.len() > 10 {
+        let _ = fs::remove_file(old.remove(0));
+    }
+    Ok(())
 }
 
 /// Apaga a música. Verdadeiro se o arquivo existia.
@@ -151,6 +182,12 @@ mod tests {
         let songs = list(&dir);
         assert_eq!(songs.len(), 2);
         assert_eq!(songs[0]["key"], "A");
+        // A versão anterior ficou guardada no histórico.
+        let hist: Vec<_> = fs::read_dir(dir.join("historico"))
+            .unwrap()
+            .flatten()
+            .collect();
+        assert_eq!(hist.len(), 1);
 
         assert!(remove(&dir, &id));
         assert!(!remove(&dir, "../etc"));

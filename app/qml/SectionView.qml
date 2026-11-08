@@ -108,7 +108,7 @@ Flow {
                 if (f < 0) continue
                 notes.push({ string: st, fret: f })
             }
-            if (notes.length) events.push({ notes: notes, arrow: Examples.strokeUp(code) ? "U" : "D" })
+            if (notes.length) events.push({ notes: notes, arrow: Examples.isMute(code) ? code : Examples.strokeUp(code) ? "U" : "D" })
         }
         return events
     }

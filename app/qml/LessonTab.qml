@@ -219,7 +219,7 @@ Item {
                         Text {
                             anchors.horizontalCenter: parent.horizontalCenter
                             y: root.rowH * 7 + 2
-                            text: ev.modelData.arrow === "U" ? "↑" : ev.modelData.arrow === "D" ? "↓" : ""
+                            text: ev.modelData.arrow ? Examples.strokeArrow(ev.modelData.arrow) : ""
                             color: ev.active ? Theme.chord : Theme.textDim
                             font.pixelSize: (ev.active ? 22 : 18) * root.zoom
                             font.bold: true

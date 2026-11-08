@@ -201,9 +201,11 @@ fn split_glued(token: &str) -> Option<(&str, &str)> {
 
 /// Linha só com setas de batida (↓ ↑) e x de abafado.
 pub(crate) fn is_arrow_line(line: &str) -> bool {
-    line.chars().any(|c| matches!(c, '↓' | '↑' | '⇣' | '⇡'))
+    line.chars()
+        .any(|c| matches!(c, '↓' | '↑' | '⇣' | '⇡' | '⇓' | '⇑'))
         && line.chars().all(|c| {
-            c.is_whitespace() || matches!(c, '↓' | '↑' | '⇣' | '⇡' | 'x' | 'X' | '✕' | '×')
+            c.is_whitespace()
+                || matches!(c, '↓' | '↑' | '⇣' | '⇡' | '⇓' | '⇑' | 'x' | 'X' | '✕' | '×')
         })
 }
 

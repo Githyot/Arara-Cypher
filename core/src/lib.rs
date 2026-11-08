@@ -8,6 +8,7 @@ pub mod chorddb;
 pub mod library;
 pub mod lyrics;
 pub mod ocr;
+pub mod pitch;
 pub mod rhythm;
 pub mod shape;
 pub mod sheet;

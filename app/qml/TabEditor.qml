@@ -195,7 +195,14 @@ Column {
     }
     function cycleArrow(si, ei) {
         var e = model[si].events[ei]
-        e.arrow = e.arrow === "" ? "D" : e.arrow === "D" ? "U" : ""
+        var order = ["", "D", "U", "X", "XU"]
+        e.arrow = order[(order.indexOf(e.arrow) + 1) % order.length]
+        commit()
+    }
+    // Seta do toque escolhido: "", D, U, X (↓ abafada), XU (↑ abafada).
+    function setArrow(a) {
+        if (!current) return
+        model[curS].events[curE].arrow = a
         commit()
     }
     function toggleBar() {
@@ -408,7 +415,7 @@ Column {
                             Text {
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 y: root.rowH * 7 + 1
-                                text: col.modelData.arrow === "U" ? "↑" : col.modelData.arrow === "D" ? "↓" : "·"
+                                text: col.modelData.arrow ? Examples.strokeArrow(col.modelData.arrow) : "·"
                                 color: col.modelData.arrow ? Theme.chord : Theme.textDim
                                 font.pixelSize: 17
                                 font.bold: true
@@ -501,10 +508,28 @@ Column {
         AppButton { text: "x (não tocar)"; enabled: !!root.current; onClicked: { root.forceActiveFocus(); root.setNote(root.curString, root.muted) } }
         AppButton { text: "Duplicar"; enabled: !!root.current; onClicked: root.duplicate() }
         AppButton { text: "Excluir toque"; enabled: !!root.current; onClicked: root.remove() }
-        AppButton {
-            enabled: !!root.current
-            text: "Seta: " + (root.current && root.current.arrow === "D" ? "↓" : root.current && root.current.arrow === "U" ? "↑" : "nenhuma")
-            onClicked: root.cycleArrow(root.curS, root.curE)
+        // Seta do toque: escolhe direto (abafada = ↓× / ↑×).
+        Row {
+            spacing: 4
+            Text {
+                height: Theme.controlHeight
+                verticalAlignment: Text.AlignVCenter
+                text: "Seta:"
+                color: Theme.textDim
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSize - 1
+            }
+            Repeater {
+                model: [{ code: "", label: "nenhuma" }, { code: "D", label: "↓" }, { code: "U", label: "↑" },
+                        { code: "X", label: "↓× abafada" }, { code: "XU", label: "↑× abafada" }]
+                AppButton {
+                    required property var modelData
+                    enabled: !!root.current
+                    text: modelData.label
+                    suggested: root.rev, !!root.current && root.current.arrow === modelData.code
+                    onClicked: { root.forceActiveFocus(); root.setArrow(modelData.code) }
+                }
+            }
         }
         AppButton {
             enabled: !!root.current && root.curE > 0

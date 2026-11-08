@@ -219,9 +219,21 @@ pub struct LessonChord {
 pub struct LessonEvent {
     pub col: usize,
     pub notes: Vec<TabNote>,
-    /// "D" (para baixo), "U" (para cima) ou vazio.
+    /// "D" (para baixo), "U" (para cima), "X"/"XU" (abafada, para baixo ou
+    /// para cima) ou vazio.
     #[serde(skip_serializing_if = "String::is_empty")]
     pub arrow: String,
+}
+
+/// Caractere da seta na linha de setas da tab: ↓ ↑, e ⇓ ⇑ para a batida
+/// abafada (no app aparecem como ↓× e ↑×).
+fn arrow_char(arrow: &str) -> char {
+    match arrow {
+        "U" => '↑',
+        "X" => '⇓',
+        "XU" => '⇑',
+        _ => '↓',
+    }
 }
 
 pub fn lesson(text: &str) -> Vec<System> {
@@ -338,7 +350,7 @@ fn rewrite_block(block: &[&str], sys: &System) -> Vec<String> {
         if line.len() <= at {
             line.resize(at + 1, ' ');
         }
-        line[at] = if e.arrow == "U" { '↑' } else { '↓' };
+        line[at] = arrow_char(&e.arrow);
     }
     let mut out = Vec::new();
     let mut placed = false;
@@ -533,7 +545,7 @@ pub fn render(systems: &[EditSystem]) -> String {
                 if arrow_line.len() <= at {
                     arrow_line.resize(at + 1, ' ');
                 }
-                arrow_line[at] = if ev.arrow == "U" { '↑' } else { '↓' };
+                arrow_line[at] = arrow_char(&ev.arrow);
             }
             pos += w + 3;
         }
@@ -678,6 +690,8 @@ fn lesson_block(block: &[&str]) -> Option<System> {
             let arrow = match ch {
                 '↓' | '⇣' => "D",
                 '↑' | '⇡' => "U",
+                '⇓' => "X",
+                '⇑' => "XU",
                 _ => continue,
             };
             if let Some(col) = body_col(i) {
@@ -730,6 +744,17 @@ E|-----------------------|";
             frets(&ev),
             ["1:8", "1:8", "2:6", "3:8", "3:6", "3:5", "2:8", "2:/10"]
         );
+    }
+
+    #[test]
+    fn muted_arrows_round_trip() {
+        let tab = "e|--0--0--|\nB|--1--1--|\nG|--0--0--|\nD|--2--2--|\nA|--3--3--|\nE|-----x--|\n    ⇓  ⇑\n";
+        let sys = &lesson(tab)[0];
+        assert_eq!(sys.events[0].arrow, "X");
+        assert_eq!(sys.events[1].arrow, "XU");
+        let m = edit_model(tab);
+        let again = &lesson(&render(&m))[0];
+        assert_eq!(again.events[1].arrow, "XU");
     }
 
     #[test]

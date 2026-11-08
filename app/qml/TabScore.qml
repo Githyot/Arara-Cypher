@@ -270,8 +270,14 @@ Canvas {
                 if (ev.arrow) {
                     ctx.fillStyle = accent
                     ctx.font = "bold 15px sans-serif"
-                    var ar = ev.arrow === "U" ? "↑" : "↓"
+                    var ar = ev.arrow === "U" || ev.arrow === "XU" ? "↑" : "↓"
                     ctx.fillText(ar, cx - ctx.measureText(ar).width / 2, tabBottom + 22)
+                    if (ev.arrow === "X" || ev.arrow === "XU") {
+                        // Batida abafada: × junto da seta.
+                        ctx.fillStyle = Theme.destructive
+                        ctx.font = "bold 13px sans-serif"
+                        ctx.fillText("×", cx + 3, tabBottom + 15)
+                    }
                     ctx.font = "bold 11px sans-serif"
                 }
                 // Pauta.
@@ -381,7 +387,8 @@ Canvas {
             for (var i = 0; i < row.length; ++i) {
                 var w = row[i].bar ? root.barW : root.slotW
                 if (lx >= x && lx < x + w && !row[i].bar) {
-                    var next = row[i].arrow === "" ? "D" : row[i].arrow === "D" ? "U" : ""
+                    var order = ["", "D", "U", "X", "XU"]
+                    var next = order[(order.indexOf(row[i].arrow) + 1) % order.length]
                     root.arrowClicked(row[i].s, row[i].e, next)
                     return
                 }

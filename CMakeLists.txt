@@ -9,7 +9,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2)
+find_package(Qt6 6.4 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 Multimedia)
 # Ferramenta só do desktop; no Android o androiddeployqt faz essa varredura.
 find_package(Qt6 6.4 QUIET OPTIONAL_COMPONENTS QmlImportScanner)
 
@@ -56,8 +56,8 @@ cxx_qt_import_qml_module(araracypher_qml_module
     URI "AraraCypher"
     SOURCE_CRATE araracypher_app)
 
-qt_add_executable(araracypher cpp/main.cpp)
-target_link_libraries(araracypher PRIVATE araracypher_qml_module Qt::Quick Qt::QuickControls2)
+qt_add_executable(araracypher cpp/main.cpp cpp/mic.cpp cpp/mic.h)
+target_link_libraries(araracypher PRIVATE araracypher_qml_module Qt::Quick Qt::QuickControls2 Qt::Multimedia)
 if(TARGET Qt6::qmlimportscanner OR Qt6QmlImportScanner_FOUND)
     qt_import_qml_plugins(araracypher)
 endif()

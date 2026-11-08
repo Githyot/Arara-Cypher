@@ -4,6 +4,9 @@
 #include <QtGui/QGuiApplication>
 #include <QtQml/QQmlApplicationEngine>
 #include <QtQuickControls2/QQuickStyle>
+#include <QtQml/qqml.h>
+
+#include "mic.h"
 
 int
 main(int argc, char* argv[])
@@ -19,6 +22,9 @@ main(int argc, char* argv[])
   // Os temas GNOME e Apple são desenhados pelo próprio app em cima do
   // estilo "Basic", que é igual em todas as plataformas.
   QQuickStyle::setStyle(QStringLiteral("Basic"));
+
+  // Microfone (afinador e "Tocar junto"): import AraraCypher.Audio.
+  qmlRegisterType<Mic>("AraraCypher.Audio", 1, 0, "Mic");
 
   QQmlApplicationEngine engine;
   // O Qt 6.5+ já procura módulos QML em qrc:/qt/qml; no 6.4 é preciso avisar.

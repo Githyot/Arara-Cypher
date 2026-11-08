@@ -4,6 +4,7 @@ import QtQuick.Layouts
 import QtMultimedia
 import Qt.labs.settings
 import AraraCypher
+import AraraCypher.Audio
 
 // Visualização de uma cifra: seções com os acordes, tom e transposição, e um
 // menu de opções (rolagem automática, colunas, capotraste, afinação, mostrar
@@ -271,6 +272,86 @@ Rectangle {
 
     function t(chord) { return Music.transposeChord(chord, shift) }
 
+    // ---- Tocar junto: o microfone ouve o acorde e a música anda sozinha ----
+    Mic { id: mic }
+    property bool playAlong: false
+    onPlayAlongChanged: { mic.active = playAlong; if (playAlong) { playIdx = 0; heard = ""; streak = 0; goToSection() } }
+    onVisibleChanged: if (!visible) playAlong = false
+    // Sequência dos acordes na ordem em que se toca (com as repetições).
+    readonly property var playSeq: {
+        var out = []
+        if (!song) return out
+        for (var i = 0; i < song.sections.length; ++i) {
+            var cs = partChords(song.sections[i])
+            for (var r = 0; r < Math.max(1, song.sections[i].repeat || 1); ++r)
+                for (var k = 0; k < cs.length; ++k) out.push({ sec: i, chord: cs[k] })
+        }
+        return out
+    }
+    property int playIdx: 0
+    property string heard: ""          // acorde ouvido agora (nome na tela)
+    property int streak: 0
+    property string lastGuess: ""
+    // Notas que soam em cada acorde da música: o nome que soa (com capo)
+    // e a forma do app, sem capo.
+    readonly property var templates: {
+        var out = {}
+        if (!song) return out
+        var open = [4, 9, 2, 7, 11, 4]
+        playSeq.forEach(function (p) {
+            if (out[p.chord] !== undefined) return
+            var sounding = Music.transposeChord(Examples.chordName(p.chord), shift + capo)
+            var js = Music.chordShape(sounding, 0)
+            if (!js) { out[p.chord] = null; return }
+            var sh = JSON.parse(js), v = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+            for (var st = 0; st < 6; ++st) if (sh.frets[st] >= 0) v[(open[st] + sh.frets[st]) % 12] = 1
+            if (sh.frets[sh.root] >= 0) v[(open[sh.root] + sh.frets[sh.root]) % 12] = 1.3
+            out[p.chord] = v
+        })
+        return out
+    }
+    function guessChord(chroma) {
+        var best = "", bestScore = 0, cn = 0
+        for (var i = 0; i < 12; ++i) cn += chroma[i] * chroma[i]
+        if (cn <= 0) return ""
+        for (var name in templates) {
+            var v = templates[name]
+            if (!v) continue
+            var dot = 0, vn = 0
+            for (var j = 0; j < 12; ++j) { dot += v[j] * chroma[j]; vn += v[j] * v[j] }
+            var sc = dot / Math.sqrt(cn * vn)
+            if (sc > bestScore) { bestScore = sc; best = name }
+        }
+        return bestScore > 0.72 ? best : ""
+    }
+    function goToSection() {
+        if (!playSeq.length) return
+        var item = secRepeater.itemAt(playSeq[playIdx].sec)
+        if (!item) return
+        var y = item.mapToItem(content, 0, 0).y + content.y - 70
+        flick.contentY = Math.max(0, Math.min(flick.contentHeight - flick.height, y))
+    }
+    function stepPlay(d) {
+        var old = playSeq.length ? playSeq[playIdx].sec : -1
+        playIdx = Math.max(0, Math.min(playSeq.length - 1, playIdx + d))
+        if (playSeq.length && playSeq[playIdx].sec !== old) goToSection()
+    }
+    Connections {
+        target: mic
+        function onUpdated() {
+            if (!page.playAlong) return
+            var g = mic.level > 0.01 ? page.guessChord(mic.chroma) : ""
+            page.streak = g !== "" && g === page.lastGuess ? page.streak + 1 : 1
+            page.lastGuess = g
+            if (page.streak < 3) return
+            page.heard = g
+            // Ouviu o próximo acorde (ou o seguinte, se pulou um): anda.
+            var seq = page.playSeq, i = page.playIdx
+            if (i + 1 < seq.length && seq[i + 1].chord === g) page.stepPlay(1)
+            else if (i + 2 < seq.length && seq[i + 2].chord === g && seq[i + 1].chord !== seq[i].chord) page.stepPlay(2)
+        }
+    }
+
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
@@ -284,11 +365,69 @@ Rectangle {
                 onClicked: page.edit()
             }
             AppButton {
+                text: page.playAlong ? "■ Tocar junto" : "Tocar junto"
+                flat: true
+                onClicked: page.playAlong = !page.playAlong
+            }
+            AppButton {
                 text: page.scrolling ? "Parar" : "Rolar"
                 flat: true
                 onClicked: page.scrolling = !page.scrolling
             }
             AppButton { text: "Voltar"; flat: true; onClicked: page.back() }
+        }
+
+        // Barra do Tocar junto: acorde da vez, os próximos e o que o microfone ouve.
+        Rectangle {
+            visible: page.playAlong
+            Layout.fillWidth: true
+            implicitHeight: playRow.implicitHeight + 16
+            color: Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, Theme.dark ? 0.18 : 0.10)
+            RowLayout {
+                id: playRow
+                x: 12; y: 8
+                width: parent.width - 24
+                spacing: 8
+                AppButton { text: "◀"; flat: true; onClicked: page.stepPlay(-1) }
+                Text {
+                    text: page.playSeq.length ? page.song.sections[page.playSeq[page.playIdx].sec].name : "Sem acordes"
+                    color: Theme.textDim
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSize - 1
+                }
+                Repeater {
+                    model: page.playSeq.slice(page.playIdx, page.playIdx + 5)
+                    Rectangle {
+                        required property var modelData
+                        required property int index
+                        width: chipText.implicitWidth + 20; height: Theme.controlHeight; radius: Theme.radiusSmall
+                        color: index === 0 ? Theme.chord : Qt.rgba(Theme.chord.r, Theme.chord.g, Theme.chord.b, 0.15)
+                        Text {
+                            id: chipText
+                            anchors.centerIn: parent
+                            text: page.t(Examples.chordName(parent.modelData.chord))
+                            color: parent.index === 0 ? Theme.card : Theme.chord
+                            font.family: Theme.monoFamily
+                            font.pixelSize: parent.index === 0 ? Theme.fontSize + 3 : Theme.fontSize
+                            font.bold: true
+                        }
+                    }
+                }
+                AppButton { text: "▶"; flat: true; onClicked: page.stepPlay(1) }
+                Item { Layout.fillWidth: true }
+                Text {
+                    text: mic.error !== "" ? mic.error
+                         : "Ouvindo: " + (page.heard ? page.t(Examples.chordName(page.heard)) : "…")
+                    color: mic.error !== "" ? Theme.destructive : Theme.text
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSize - 1
+                }
+                Rectangle {
+                    width: 60; height: 6; radius: 3
+                    color: Theme.button
+                    Rectangle { width: parent.width * Math.min(1, mic.level * 8); height: parent.height; radius: 3; color: Theme.accent }
+                }
+            }
         }
 
         Flickable {
@@ -641,6 +780,7 @@ Rectangle {
                     columnSpacing: 16
                     rowSpacing: 14
                     Repeater {
+                        id: secRepeater
                         model: page.song && !page.showFullScore ? page.song.sections : []
                         Collapsible {
                             id: section

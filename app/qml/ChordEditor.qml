@@ -10,7 +10,23 @@ Column {
     id: root
     property var voicing: null
     property int rev: 0
+    property string chord: ""           // nome (ou token "X@2") para o Banco de Braços
+    property int capo: 0                // casas de verdade: o banco conta do capo
     signal changed()
+
+    // Banco de Braços: outras formas conhecidas deste acorde.
+    readonly property var bank: chord ? JSON.parse(Music.chordShapes(Examples.chordName(chord), 0)) : []
+    property int bankIndex: -1
+    onChordChanged: bankIndex = -1
+    function useBank(i) {
+        if (!voicing || bank.length === 0) return
+        bankIndex = (i + bank.length) % bank.length
+        var b = bank[bankIndex]
+        for (var s = 0; s < 6; ++s) voicing.frets[s] = b.frets[s] > 0 ? b.frets[s] + capo : b.frets[s]
+        voicing.fingers = b.fingers.slice()
+        fitBase()
+        touch()
+    }
 
     property int finger: 1                 // dedo que o próximo clique põe
     property int localRev: 0
@@ -46,6 +62,30 @@ Column {
         voicing.frets[s] = voicing.frets[s] === 0 ? -1 : 0
         voicing.fingers[s] = 0
         touch()
+    }
+
+    // Formas do Banco de Braços.
+    Row {
+        visible: root.bank.length > 0
+        spacing: 6
+        Text {
+            height: Theme.controlHeight
+            verticalAlignment: Text.AlignVCenter
+            text: "Banco de Braços:"
+            color: Theme.textDim
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontSize - 1
+        }
+        AppButton { text: "◀"; onClicked: root.useBank(root.bankIndex < 0 ? root.bank.length - 1 : root.bankIndex - 1) }
+        Text {
+            height: Theme.controlHeight
+            verticalAlignment: Text.AlignVCenter
+            text: root.bankIndex < 0 ? root.bank.length + " formas" : "forma " + (root.bankIndex + 1) + " de " + root.bank.length
+            color: Theme.text
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontSize - 1
+        }
+        AppButton { text: "▶"; onClicked: root.useBank(root.bankIndex + 1) }
     }
 
     // Dedo escolhido.

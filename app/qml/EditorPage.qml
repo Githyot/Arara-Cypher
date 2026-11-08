@@ -905,6 +905,8 @@ Rectangle {
                         ChordEditor {
                             width: parent.width
                             voicing: voicingCard.v
+                            chord: page.editingChord
+                            capo: page.draft && page.draft.fretsReal ? (page.draft.capo || 0) : 0
                             rev: page.rev
                             onChanged: page.bump()
                         }

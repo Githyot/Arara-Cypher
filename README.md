@@ -49,3 +49,7 @@ Testes do núcleo (não precisam do Qt): `cargo test -p araracypher-core`.
 ## Licença
 
 GPL-3.0-or-later. Veja [LICENSE](LICENSE).
+
+O Banco de Braços (`core/data/chords-db.json`) vem do projeto
+[chords-db](https://github.com/tombatossals/chords-db), de David Rubert, sob a
+licença MIT (veja [core/data/chords-db.LICENSE](core/data/chords-db.LICENSE)).

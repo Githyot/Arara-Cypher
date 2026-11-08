@@ -25,6 +25,11 @@ pub mod qobject {
         #[cxx_name = "chordShape"]
         fn chord_shape(&self, name: &QString, semitones: i32) -> QString;
 
+        /// Todas as formas do Banco de Braços para o acorde (já transposto), em JSON.
+        #[qinvokable]
+        #[cxx_name = "chordShapes"]
+        fn chord_shapes(&self, name: &QString, semitones: i32) -> QString;
+
         /// Verdadeiro se o texto é um nome de acorde válido.
         #[qinvokable]
         #[cxx_name = "isChord"]
@@ -127,7 +132,7 @@ pub mod qobject {
     }
 }
 
-use araracypher_core::{chord, library, ocr, shape, sheet, tab, Chord};
+use araracypher_core::{chord, chorddb, library, ocr, shape, sheet, tab, Chord};
 use core::pin::Pin;
 use cxx_qt::CxxQtType;
 use cxx_qt_lib::QString;
@@ -153,6 +158,11 @@ impl qobject::Music {
     pub fn chord_shape(&self, name: &QString, semitones: i32) -> QString {
         let transposed = chord::transpose_name(&name.to_string(), semitones);
         QString::from(shape::shape_json(&transposed).as_str())
+    }
+
+    pub fn chord_shapes(&self, name: &QString, semitones: i32) -> QString {
+        let transposed = chord::transpose_name(&name.to_string(), semitones);
+        QString::from(chorddb::shapes_json(&transposed).as_str())
     }
 
     pub fn is_chord(&self, name: &QString) -> bool {

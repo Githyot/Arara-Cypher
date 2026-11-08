@@ -257,7 +257,7 @@ pub fn shape_for(chord: &Chord) -> Option<ChordShape> {
 pub fn shape_json(name: &str) -> String {
     name.parse::<Chord>()
         .ok()
-        .and_then(|c| shape_for(&c))
+        .and_then(|c| shape_for(&c).or_else(|| crate::chorddb::shapes(&c).into_iter().next()))
         .map(|s| s.to_json())
         .unwrap_or_default()
 }

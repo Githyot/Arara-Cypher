@@ -211,6 +211,8 @@ Flow {
                     visible: root.editing && seg.open
                     width: implicitWidth
                     voicing: seg.open ? root.ownVoicing(seg.name) : null
+                    chord: seg.name
+                    capo: root.song && root.song.fretsReal ? (root.song.capo || 0) : 0
                     rev: root.rev
                     onChanged: root.edited()
                 }
@@ -299,6 +301,8 @@ Flow {
                     visible: root.editing && box.open
                     width: implicitWidth
                     voicing: box.open ? root.ownVoicing(box.modelData) : null
+                    chord: box.modelData
+                    capo: root.song && root.song.fretsReal ? (root.song.capo || 0) : 0
                     rev: root.rev
                     onChanged: root.edited()
                 }

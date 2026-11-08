@@ -4,6 +4,7 @@
 //! sem precisar do Qt instalado.
 
 pub mod chord;
+pub mod chorddb;
 pub mod library;
 pub mod lyrics;
 pub mod ocr;

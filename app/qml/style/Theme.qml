@@ -15,12 +15,16 @@ QtObject {
     property string style: "gnome"      // "gnome" | "apple"
     property string scheme: "system"    // "system" | "light" | "dark"
     property real chordZoom: 1          // tamanho dos acordes na tela da música
+    // Partitura: batida de acorde (3+ cordas juntas) como barra de ritmo
+    // em vez das notas empilhadas. A tab continua com todas as notas.
+    property bool slashChords: true
 
     property Settings _settings: Settings {
         category: "appearance"
         property alias style: theme.style
         property alias scheme: theme.scheme
         property alias chordZoom: theme.chordZoom
+        property alias slashChords: theme.slashChords
     }
 
     // ---- Estado derivado ----

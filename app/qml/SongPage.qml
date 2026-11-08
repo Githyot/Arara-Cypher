@@ -305,7 +305,7 @@ Rectangle {
             Column {
                 id: content
                 y: Theme.pagePadding
-                width: Math.min(parent.width - 2 * Theme.pagePadding, prefs.columns > 1 ? 1400 : 720)
+                width: Math.min(parent.width - 2 * Theme.pagePadding, 1400)
                 x: (parent.width - width) / 2
                 spacing: 14
 
@@ -379,6 +379,12 @@ Rectangle {
                                     { value: "1.8", label: "GG" }]
                             current: String(Theme.chordZoom)
                             onActivated: (v) => Theme.chordZoom = Number(v)
+                        }
+                        AppButton {
+                            // Partitura das batidas: barras de ritmo ou notas.
+                            visible: page.viewMode !== "names"
+                            text: Theme.slashChords ? "Batida: barras" : "Batida: notas"
+                            onClicked: Theme.slashChords = !Theme.slashChords
                         }
                         AppButton {
                             text: "Metrônomo"

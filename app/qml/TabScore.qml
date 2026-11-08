@@ -109,6 +109,7 @@ Canvas {
         target: Theme
         function onDarkChanged() { root.requestPaint() }
         function onStyleChanged() { root.requestPaint() }
+        function onSlashChordsChanged() { root.requestPaint() }
     }
 
     function drawClef(ctx, color, x, staffTop) {
@@ -275,6 +276,31 @@ Canvas {
                 }
                 // Pauta.
                 if (!showStaff) { stems.push(null); x += slotW; continue }
+                var sounding = ev.notes.filter(function (q) { return q.fret !== 255 })
+                if (Theme.slashChords && ev.notes.length >= 3) {
+                    // Batida de acorde: barra de ritmo na linha do meio (o acorde
+                    // está escrito em cima; as notas estão na tab). Abafada = x.
+                    var my = staffTop + gap * 2
+                    ctx.strokeStyle = accent
+                    ctx.fillStyle = accent
+                    if (sounding.length === 0) {
+                        ctx.lineWidth = 2
+                        ctx.beginPath(); ctx.moveTo(cx - 4, my - 4); ctx.lineTo(cx + 4, my + 4)
+                        ctx.moveTo(cx + 4, my - 4); ctx.lineTo(cx - 4, my + 4); ctx.stroke()
+                    } else {
+                        ctx.beginPath()
+                        ctx.moveTo(cx - 5, my + 3); ctx.lineTo(cx - 1, my + 5)
+                        ctx.lineTo(cx + 5, my - 3); ctx.lineTo(cx + 1, my - 5)
+                        ctx.closePath(); ctx.fill()
+                    }
+                    var sTop2 = my - gap * 3.5
+                    ctx.strokeStyle = ink
+                    ctx.lineWidth = 1.2
+                    ctx.beginPath(); ctx.moveTo(cx + 4.5, my - 2); ctx.lineTo(cx + 4.5, sTop2); ctx.stroke()
+                    stems.push({ x: cx + 4.5, y: sTop2 })
+                    x += slotW
+                    continue
+                }
                 var minY = 1e9, maxY = -1e9, prevStep = -100
                 for (var m = 0; m < ev.notes.length; ++m) {
                     var note = ev.notes[m]

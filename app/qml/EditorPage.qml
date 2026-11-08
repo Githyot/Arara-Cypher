@@ -275,7 +275,7 @@ Rectangle {
             Column {
                 id: body
                 y: Theme.pagePadding
-                width: Math.min(parent.width - 2 * Theme.pagePadding, 760)
+                width: Math.min(parent.width - 2 * Theme.pagePadding, 1400)
                 x: (parent.width - width) / 2
                 spacing: 10
 

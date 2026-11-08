@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=AraraCypher
+GenericName=Editor de cifras
+Comment=Escreva cifras e tablaturas de violão e guitarra
+Exec=araracypher
+Icon=io.github.githyot.araracypher
+Terminal=false
+Categories=AudioVideo;Audio;Music;Education;
+Keywords=cifra;acorde;tablatura;violão;guitarra;chord;tab;guitar;
+StartupWMClass=araracypher

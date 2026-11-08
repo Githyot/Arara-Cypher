@@ -20,7 +20,7 @@ no **Android**, com dois visuais à escolha: **GNOME** (Adwaita) e **Apple**.
 Cada build no GitHub Actions gera dois arquivos na aba **Actions** → último
 build → **Artifacts**:
 
-- `araracypher-fedora-rpm`: instale com `sudo dnf install ./araracypher-*.rpm`
+- `araracypher-fedoraNN-rpm`: escolha o NN da sua versão (`rpm -E %fedora`) e instale com `sudo dnf install ./araracypher-*.rpm`
 - `araracypher-android-apk`: copie para o celular e abra para instalar
   (é preciso permitir "instalar apps desconhecidos").
 
@@ -49,3 +49,7 @@ Testes do núcleo (não precisam do Qt): `cargo test -p araracypher-core`.
 ## Licença
 
 GPL-3.0-or-later. Veja [LICENSE](LICENSE).
+
+O Banco de Braços (`core/data/chords-db.json`) vem do projeto
+[chords-db](https://github.com/tombatossals/chords-db), de David Rubert, sob a
+licença MIT (veja [core/data/chords-db.LICENSE](core/data/chords-db.LICENSE)).

@@ -652,15 +652,26 @@ Rectangle {
                                     zoom: page.zoom
                                 }
                                 // Tab: os acordes numa tab só, comprida, como na partitura.
-                                StrumStrip {
+                                Item {
                                     visible: page.chordMode === "tab" && section.modelData.chords.length > 0
                                     width: parent.width
+                                    height: Math.max(strip.implicitHeight, hand.implicitHeight)
+                                    HandLegend {
+                                        id: hand
+                                        anchors.right: parent.right
+                                        zoom: Math.min(page.zoom, 1.2)
+                                    }
+                                StrumStrip {
+                                    id: strip
+                                    visible: page.chordMode === "tab" && section.modelData.chords.length > 0
+                                    width: parent.width - hand.width - 12
                                     chords: visible ? section.modelData.chords : []
                                     song: page.song
                                     semitones: page.shift
                                     pattern: section.strum ? section.strum.pattern : ["D"]
                                     counts: section.strum ? section.strum.counts : []
                                     zoom: page.zoom
+                                }
                                 }
                                 Flow {
                                     visible: page.chordMode !== "tab" && section.modelData.chords.length > 0

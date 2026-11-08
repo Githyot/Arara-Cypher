@@ -268,5 +268,9 @@ Item {
             voicing: root.song && root.currentChord ? Examples.voicing(root.song, root.currentChord) : null
             semitones: root.semitones
         }
+        HandLegend {
+            anchors.horizontalCenter: parent.horizontalCenter
+            zoom: Math.min(root.zoom, 1.2)
+        }
     }
 }

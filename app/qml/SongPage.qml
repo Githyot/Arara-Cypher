@@ -33,7 +33,7 @@ Rectangle {
         prefs.scrollSpeed = 3; prefs.pedal = true
         capo = songCapo; tuning = 0; semitones = 0
         Theme.chordZoom = 1
-        viewMode = "tab"; fullScore = false
+        viewMode = "all"; fullScore = false
         scrolling = false; metroVisible = false; metro.running = false
         metro.bpm = songBpm
     }
@@ -155,7 +155,7 @@ Rectangle {
         metro.beat = -1
         metro.running = true
     }
-    property string viewMode: "tab"   // "names" | "diagram" | "big" | "tab" | "score" | "lesson"
+    property string viewMode: "all"   // "all" | "names" | "diagram" | "big" | "tab" | "score" | "lesson"
     // Na aula, as partes sem tab aparecem como na visualização Tab.
     readonly property string chordMode: viewMode === "lesson" ? "tab" : viewMode
     property bool fullScore: false     // partitura da música inteira, em linhas
@@ -353,7 +353,8 @@ Rectangle {
                         width: parent.width
                         spacing: 8
                         SegmentedControl {
-                            model: [{ value: "names", label: "Nomes" },
+                            model: [{ value: "all", label: "Tudo" },
+                                    { value: "names", label: "Nomes" },
                                     { value: "diagram", label: "Braço" },
                                     { value: "big", label: "Detalhado" },
                                     { value: "tab", label: "Tab" },
@@ -375,7 +376,7 @@ Rectangle {
                             onClicked: page.metroVisible = !page.metroVisible
                         }
                         AppButton {
-                            visible: page.chordMode === "tab" || (page.viewMode === "score" && !page.fullScore)
+                            visible: page.chordMode === "tab" || page.viewMode === "all" || (page.viewMode === "score" && !page.fullScore)
                             text: page.editingTab ? "Concluir edição" : "Editar tab"
                             suggested: page.editingTab
                             onClicked: page.editingTab = !page.editingTab
@@ -645,7 +646,7 @@ Rectangle {
                             Card {
                                 width: parent.width
                                 TabText {
-                                    visible: prefs.showTabs && !!section.modelData.tab && ["tab", "score", "lesson"].indexOf(page.viewMode) < 0
+                                    visible: prefs.showTabs && !!section.modelData.tab && ["tab", "score", "lesson", "all"].indexOf(page.viewMode) < 0
                                     width: parent.width
                                     tab: section.modelData.tab || ""
                                     zoom: page.zoom
@@ -663,7 +664,7 @@ Rectangle {
                                     onBeat: (strong) => metroSound.play(strong)
                                 }
                                 TabScore {
-                                    visible: prefs.showTabs && !!section.modelData.tab && (page.viewMode === "tab" || page.viewMode === "score")
+                                    visible: prefs.showTabs && !!section.modelData.tab && (page.viewMode === "tab" || page.viewMode === "score" || (page.viewMode === "all" && page.editingTab))
                                     width: parent.width
                                     height: implicitHeight
                                     tab: page.rev, visible ? page.song.sections[section.index].tab : ""
@@ -679,8 +680,21 @@ Rectangle {
                                 }
                                 // Tab: os acordes numa tab só, comprida, como na partitura
                                 // (com "Editar tab", toca numa casa ou numa seta para mudar).
+                                // Tudo: braço + partitura + tab de cada acorde, num quadro só
+                                // (editando, mostra a tab inteira para mexer).
+                                SectionView {
+                                    visible: page.viewMode === "all" && !page.editingTab
+                                    width: parent.width
+                                    section: visible ? page.song.sections[section.index] : null
+                                    song: page.song
+                                    strum: section.strum
+                                    semitones: page.shift
+                                    zoom: page.zoom
+                                    keyName: page.song ? page.t(page.song.key) : "C"
+                                    rev: page.rev
+                                }
                                 ChordTab {
-                                    visible: page.chordMode === "tab" && section.modelData.chords.length > 0
+                                    visible: (page.chordMode === "tab" || (page.viewMode === "all" && page.editingTab)) && section.modelData.chords.length > 0
                                     width: parent.width
                                     chords: visible ? section.modelData.chords : []
                                     song: page.song
@@ -694,7 +708,7 @@ Rectangle {
                                     onEdited: page.persist()
                                 }
                                 Flow {
-                                    visible: page.chordMode !== "tab" && section.modelData.chords.length > 0
+                                    visible: page.chordMode !== "tab" && page.viewMode !== "all" && section.modelData.chords.length > 0
                                     width: parent.width
                                     spacing: 8
                                     Repeater {

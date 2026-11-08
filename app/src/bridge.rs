@@ -177,7 +177,9 @@ impl qobject::Music {
         if system < 0 || event < 0 {
             return QString::from(t.as_str());
         }
-        QString::from(tab::set_arrow(&t, system as usize, event as usize, &arrow.to_string()).as_str())
+        QString::from(
+            tab::set_arrow(&t, system as usize, event as usize, &arrow.to_string()).as_str(),
+        )
     }
 
     pub fn lesson_tab(&self, text: &QString) -> QString {

@@ -301,7 +301,10 @@ fn rewrite_block(block: &[&str], sys: &System) -> Vec<String> {
     let Some(first_tab) = block.iter().position(|l| split_line(l).is_some()) else {
         return block.iter().map(|l| l.to_string()).collect();
     };
-    let last_tab = block.iter().rposition(|l| split_line(l).is_some()).unwrap_or(first_tab);
+    let last_tab = block
+        .iter()
+        .rposition(|l| split_line(l).is_some())
+        .unwrap_or(first_tab);
     let lead = block[first_tab].len() - block[first_tab].trim_start().len();
     let offset = block[first_tab].trim_start().find('|').unwrap_or(0) + 1 + lead;
     let has = sys.events.iter().any(|e| !e.arrow.is_empty());
@@ -311,7 +314,11 @@ fn rewrite_block(block: &[&str], sys: &System) -> Vec<String> {
             continue;
         }
         // Embaixo do último algarismo da nota mais grave (onde o olho bate).
-        let len = e.notes.first().map(|n| n.fret.to_string().len()).unwrap_or(1);
+        let len = e
+            .notes
+            .first()
+            .map(|n| n.fret.to_string().len())
+            .unwrap_or(1);
         let at = offset + e.col + len - 1;
         if line.len() <= at {
             line.resize(at + 1, ' ');
@@ -329,7 +336,12 @@ fn rewrite_block(block: &[&str], sys: &System) -> Vec<String> {
             continue;
         }
         out.push(l.to_string());
-        if i == last_tab && has && !block[last_tab + 1..].iter().any(|l| crate::sheet::is_arrow_line(l)) {
+        if i == last_tab
+            && has
+            && !block[last_tab + 1..]
+                .iter()
+                .any(|l| crate::sheet::is_arrow_line(l))
+        {
             out.push(line.iter().collect());
             placed = true;
         }
@@ -417,7 +429,10 @@ pub fn edit_model(text: &str) -> Vec<EditSystem> {
             for c in &sys.chords {
                 let at = first_at(c.col);
                 if !chords.iter().any(|x| x.at == at) {
-                    chords.push(EditChord { at, name: c.name.clone() });
+                    chords.push(EditChord {
+                        at,
+                        name: c.name.clone(),
+                    });
                 }
             }
             let mut bars: Vec<usize> = sys
@@ -432,7 +447,10 @@ pub fn edit_model(text: &str) -> Vec<EditSystem> {
                 events: sys
                     .events
                     .iter()
-                    .map(|e| EditEvent { notes: e.notes.clone(), arrow: e.arrow.clone() })
+                    .map(|e| EditEvent {
+                        notes: e.notes.clone(),
+                        arrow: e.arrow.clone(),
+                    })
                     .collect(),
                 bars,
             }
@@ -472,7 +490,12 @@ pub fn render(systems: &[EditSystem]) -> String {
                 pos += 3;
             }
             let token = |n: &TabNote| format!("{}{}", n.tech, n.fret);
-            let w = ev.notes.iter().map(|n| token(n).chars().count()).max().unwrap_or(1);
+            let w = ev
+                .notes
+                .iter()
+                .map(|n| token(n).chars().count())
+                .max()
+                .unwrap_or(1);
             if let Some(c) = sys.chords.iter().find(|c| c.at == i) {
                 put(&mut chord_line, 2 + pos, &c.name);
             }
@@ -725,7 +748,13 @@ E|-----------------------|";
         );
         let model = edit_model(tab);
         assert_eq!(model[0].events.len(), 5);
-        assert_eq!(model[0].chords[0], EditChord { at: 0, name: "Am".into() });
+        assert_eq!(
+            model[0].chords[0],
+            EditChord {
+                at: 0,
+                name: "Am".into()
+            }
+        );
         assert_eq!(model[0].chords[1].name, "F");
         let text = render(&model);
         let again = edit_model(&text);

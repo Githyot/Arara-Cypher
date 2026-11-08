@@ -163,6 +163,53 @@ Rectangle {
     readonly property bool showFullScore: viewMode === "score" && fullScore
     readonly property real zoom: Theme.chordZoom
 
+    // ---- Editar a tab aqui mesmo ----
+    // Tocar numa casa abre o painel (casa, dedo, tocar ou não a corda);
+    // tocar numa seta troca o golpe daquele tempo. Muda a forma do acorde
+    // (song.voicings) e a batida da parte, e salva na biblioteca.
+    property bool editingTab: false
+    property int rev: 0
+    property var sel: null              // { section, index, token, string }
+    property string editStatus: ""
+    readonly property var strokeCodes: ["", "B", "D", "d", "U", "X"]
+    onEditingTabChanged: { sel = null; editStatus = "" }
+
+    function editShape(token) {
+        if (!song.voicings) song.voicings = {}
+        var v = song.voicings[token]
+        if (!v) {
+            var sh = Examples.shape(Examples.chordName(token), 0, null)
+            if (!sh) return null
+            v = { frets: sh.frets.slice(), fingers: sh.fingers.slice() }
+            song.voicings[token] = v
+        }
+        return v
+    }
+    function persist() {
+        rev++
+        if (song.id) { Library.save(JSON.stringify(song)); editStatus = "Salvo." }
+        else editStatus = "Mudou só nesta tela. Para guardar, toque em Editar uma cópia."
+    }
+    function setFret(token, string, fret) {
+        var v = editShape(token); if (!v) return
+        v.frets[string] = Math.max(-1, Math.min(20, fret))
+        if (v.frets[string] <= 0) v.fingers[string] = 0
+        persist()
+    }
+    function setFinger(token, string, finger) {
+        var v = editShape(token); if (!v) return
+        v.fingers[string] = finger
+        persist()
+    }
+    function cycleStroke(sectionIndex, step) {
+        var sec = song.sections[sectionIndex]
+        if (!song.strums || song.strums.length === 0) return
+        var st = song.strums[Math.min(sec.strum || 0, song.strums.length - 1)]
+        var i = strokeCodes.indexOf(st.pattern[step])
+        st.pattern[step] = strokeCodes[(i + 1) % strokeCodes.length]
+        persist()
+    }
+
     // Batidas usadas em alguma parte da música, na ordem.
     readonly property var usedStrums: {
         var out = []
@@ -362,6 +409,12 @@ Rectangle {
                             onClicked: page.metroVisible = !page.metroVisible
                         }
                         AppButton {
+                            visible: page.chordMode === "tab"
+                            text: page.editingTab ? "Concluir edição" : "Editar tab"
+                            suggested: page.editingTab
+                            onClicked: page.editingTab = !page.editingTab
+                        }
+                        AppButton {
                             visible: !!(page.song && page.song.video)
                             text: "Vídeo"
                             onClicked: Qt.openUrlExternally(page.song.video)
@@ -486,7 +539,7 @@ Rectangle {
                     width: parent.width
                     title: page.usedStrums.length > 1 ? "Batidas" : "Batida"
                     expanded: false
-                    summary: page.usedStrums.map(function (s) { return page.arrows(s.pattern) }).join("   |   ")
+                    summary: page.rev, page.usedStrums.map(function (s) { return page.arrows(s.pattern) }).join("   |   ")
 
                     Repeater {
                         model: page.usedStrums
@@ -651,6 +704,101 @@ Rectangle {
                                     keyName: page.song ? page.t(page.song.key) : "C"
                                     zoom: page.zoom
                                 }
+                                // Painel de edição da nota escolhida.
+                                Column {
+                                    id: notePanel
+                                    visible: page.editingTab && page.chordMode === "tab" && section.modelData.chords.length > 0
+                                    width: parent.width
+                                    spacing: 8
+                                    readonly property bool mine: !!page.sel && page.sel.section === section.index
+                                    readonly property var v: page.rev, mine ? Examples.shape(Examples.chordName(page.sel.token), 0, Examples.voicing(page.song, page.sel.token)) : null
+                                    readonly property int fret: v ? v.frets[page.sel.string] : -1
+                                    readonly property int finger: v ? (v.fingers[page.sel.string] || 0) : 0
+                                    Text {
+                                        width: parent.width
+                                        wrapMode: Text.WordWrap
+                                        text: notePanel.mine ? "" : "Toque num número para mudar a casa e o dedo. Toque numa seta para trocar o golpe (baixo, tudo, acorde, agudas, abafa, pausa)."
+                                              + (page.shift !== 0 ? " Na edição a tab fica no tom original." : "")
+                                              + (page.editStatus ? " " + page.editStatus : "")
+                                        visible: text.length > 0
+                                        color: Theme.textDim
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSize - 1
+                                    }
+                                    Flow {
+                                        visible: notePanel.mine
+                                        width: parent.width
+                                        spacing: 8
+                                        Text {
+                                            height: Theme.controlHeight
+                                            verticalAlignment: Text.AlignVCenter
+                                            text: notePanel.mine ? Examples.chordName(page.sel.token) + " · corda " + ["E", "A", "D", "G", "B", "e"][page.sel.string] : ""
+                                            color: Theme.chord
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontSize + 1
+                                            font.bold: true
+                                        }
+                                        Row {
+                                            spacing: 4
+                                            AppButton { iconName: "remove"; onClicked: page.setFret(page.sel.token, page.sel.string, notePanel.fret - 1) }
+                                            Text {
+                                                width: 64
+                                                height: Theme.controlHeight
+                                                horizontalAlignment: Text.AlignHCenter
+                                                verticalAlignment: Text.AlignVCenter
+                                                text: notePanel.fret < 0 ? "não toca" : notePanel.fret === 0 ? "solta" : "casa " + notePanel.fret
+                                                color: Theme.text
+                                                font.family: Theme.fontFamily
+                                                font.pixelSize: Theme.fontSize
+                                            }
+                                            AppButton { iconName: "add"; onClicked: page.setFret(page.sel.token, page.sel.string, notePanel.fret + 1) }
+                                        }
+                                        Row {
+                                            spacing: 4
+                                            Repeater {
+                                                model: [0, 1, 2, 3, 4, 5]
+                                                Rectangle {
+                                                    required property int modelData
+                                                    readonly property bool on: notePanel.finger === modelData
+                                                    width: Theme.controlHeight
+                                                    height: Theme.controlHeight
+                                                    radius: width / 2
+                                                    opacity: notePanel.fret > 0 || modelData === 0 ? 1 : 0.35
+                                                    color: on ? Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.18) : Theme.button
+                                                    border.width: on ? 3 : 2
+                                                    border.color: modelData === 0 ? Theme.textDim : Theme.fingerColors[modelData]
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        text: modelData === 0 ? "–" : modelData === 5 ? "P" : modelData
+                                                        color: modelData === 0 ? Theme.textDim : Theme.fingerColors[modelData]
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: Theme.fontSize
+                                                        font.bold: true
+                                                    }
+                                                    MouseArea {
+                                                        anchors.fill: parent
+                                                        enabled: notePanel.fret > 0 || modelData === 0
+                                                        cursorShape: Qt.PointingHandCursor
+                                                        onClicked: page.setFinger(page.sel.token, page.sel.string, modelData)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        AppButton {
+                                            text: notePanel.fret < 0 ? "Tocar a corda" : "Não tocar"
+                                            onClicked: page.setFret(page.sel.token, page.sel.string, notePanel.fret < 0 ? 0 : -1)
+                                        }
+                                        AppButton { text: "Pronto"; flat: true; onClicked: page.sel = null }
+                                        Text {
+                                            height: Theme.controlHeight
+                                            verticalAlignment: Text.AlignVCenter
+                                            text: page.editStatus
+                                            color: Theme.textDim
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontSize - 2
+                                        }
+                                    }
+                                }
                                 // Tab: os acordes numa tab só, comprida, como na partitura.
                                 Item {
                                     visible: page.chordMode === "tab" && section.modelData.chords.length > 0
@@ -667,10 +815,16 @@ Rectangle {
                                     width: parent.width - hand.width - 12
                                     chords: visible ? section.modelData.chords : []
                                     song: page.song
-                                    semitones: page.shift
-                                    pattern: section.strum ? section.strum.pattern : ["D"]
+                                    semitones: page.editingTab ? 0 : page.shift
+                                    pattern: page.rev, section.strum ? section.strum.pattern.slice() : ["D"]
                                     counts: section.strum ? section.strum.counts : []
                                     zoom: page.zoom
+                                    rev: page.rev
+                                    editing: page.editingTab
+                                    selIndex: page.sel && page.sel.section === section.index ? page.sel.index : -1
+                                    selString: page.sel ? page.sel.string : -1
+                                    onNoteClicked: (i, token, string) => page.sel = { section: section.index, index: i, token: token, string: string }
+                                    onStepClicked: (step) => page.cycleStroke(section.index, step)
                                 }
                                 }
                                 Flow {

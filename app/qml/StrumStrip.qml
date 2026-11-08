@@ -12,6 +12,12 @@ Column {
     property var pattern: ["D"]
     property var counts: []
     property real zoom: 1
+    property int rev: 0                // muda quando a música é editada aqui
+    property bool editing: false
+    property int selIndex: -1          // compasso (acorde) escolhido para editar
+    property int selString: -1
+    signal noteClicked(int index, string token, int string)
+    signal stepClicked(int step)
 
     readonly property real cellW: 22
     readonly property real rowH: 20
@@ -70,6 +76,8 @@ Column {
                 Item {
                     id: measure
                     required property string modelData
+                    required property int index
+                    readonly property int chordIndex: line.index * root.perRow + index
                     width: root.measureW
                     height: root.stripH
                     Text {
@@ -101,10 +109,14 @@ Column {
                         showStringNames: false
                         dashes: false
                         chord: Examples.chordName(measure.modelData)
-                        voicing: root.song ? Examples.voicing(root.song, measure.modelData) : null
+                        voicing: root.rev, root.song ? Examples.voicing(root.song, measure.modelData) : null
                         semitones: root.semitones
                         pattern: root.pattern
                         counts: root.counts
+                        editing: root.editing
+                        selString: root.selIndex === measure.chordIndex ? root.selString : -1
+                        onNoteClicked: (string) => root.noteClicked(measure.chordIndex, measure.modelData, string)
+                        onStepClicked: (step) => root.stepClicked(step)
                     }
                     // Barra de compasso.
                     Rectangle {

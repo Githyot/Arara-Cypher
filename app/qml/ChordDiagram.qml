@@ -130,7 +130,7 @@ Item {
             y: root.shape ? root.topPad + (f - root.shape.base + 0.5) * root.cellH - d / 2 : 0
             Text {
                 anchors.centerIn: parent
-                text: root.shape && root.shape.fingers[parent.index] > 0 ? root.shape.fingers[parent.index] : ""
+                text: root.shape && root.shape.fingers[parent.index] === 5 ? "P" : root.shape && root.shape.fingers[parent.index] > 0 ? root.shape.fingers[parent.index] : ""
                 color: Theme.dark ? "#000000" : "#ffffff"
                 font.family: Theme.fontFamily
                 font.pixelSize: 9

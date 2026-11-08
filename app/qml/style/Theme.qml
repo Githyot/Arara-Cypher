@@ -70,7 +70,8 @@ QtObject {
         dark ? "#62a0ea" : "#1c71d8",   // 1 indicador: azul
         dark ? "#57e389" : "#26a269",   // 2 médio: verde
         dark ? "#f8e45c" : "#c88800",   // 3 anelar: amarelo
-        dark ? "#dc8add" : "#9141ac"]   // 4 mínimo: roxo
+        dark ? "#dc8add" : "#9141ac",   // 4 mínimo: roxo
+        dark ? "#f66151" : "#c01c28"]   // P polegar: vermelho
     readonly property color chord: apple ? (dark ? "#ff9f0a" : "#c93400")
                                          : (dark ? "#ffa348" : "#c64600")
 

@@ -12,6 +12,7 @@ fn main() {
         "qml/StrumTab.qml",
         "qml/StrumStrip.qml",
         "qml/HandLegend.qml",
+        "qml/StrumSlots.qml",
         "qml/TabScore.qml",
         "qml/LessonTab.qml",
         "qml/TabText.qml",

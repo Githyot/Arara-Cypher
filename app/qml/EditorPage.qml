@@ -524,56 +524,11 @@ Rectangle {
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSize - 2
                             }
-                            Flow {
+                            StrumSlots {
                                 width: parent.width
-                                spacing: 4
-                                Repeater {
-                                    model: strumCard.modelData.pattern
-                                    Rectangle {
-                                        id: slot
-                                        required property string modelData
-                                        required property int index
-                                        width: 52
-                                        height: 62
-                                        radius: Theme.radiusSmall
-                                        color: modelData === "" ? Theme.button
-                                             : Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.18)
-                                        Column {
-                                            anchors.centerIn: parent
-                                            spacing: 1
-                                            Text {
-                                                anchors.horizontalCenter: parent.horizontalCenter
-                                                text: slot.modelData === "" ? "·" : slot.modelData === "U" ? "↑" : "↓"
-                                                color: slot.modelData === "" || slot.modelData === "X" ? Theme.textDim : Theme.accent
-                                                font.pixelSize: 22
-                                                font.weight: Font.Bold
-                                            }
-                                            Text {
-                                                anchors.horizontalCenter: parent.horizontalCenter
-                                                text: slot.modelData === "" ? " " : page.codeLabel[slot.modelData]
-                                                color: Theme.text
-                                                font.family: Theme.fontFamily
-                                                font.pixelSize: 10
-                                            }
-                                            Text {
-                                                anchors.horizontalCenter: parent.horizontalCenter
-                                                text: strumCard.modelData.counts[slot.index] || ""
-                                                color: Theme.textDim
-                                                font.family: Theme.fontFamily
-                                                font.pixelSize: 11
-                                            }
-                                        }
-                                        MouseArea {
-                                            anchors.fill: parent
-                                            cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                var i = page.codes.indexOf(slot.modelData)
-                                                strumCard.modelData.pattern[slot.index] = page.codes[(i + 1) % page.codes.length]
-                                                page.bump()
-                                            }
-                                        }
-                                    }
-                                }
+                                strum: strumCard.modelData
+                                rev: page.rev
+                                onChanged: page.bump()
                             }
                         }
                     }
@@ -680,7 +635,10 @@ Rectangle {
                                     width: parent.width
                                     title: secCard.modelData.name || "Parte sem nome"
                                     badge: (secCard.modelData.repeat || 1) > 1 ? secCard.modelData.repeat + "×" : ""
-                                    summary: secCard.modelData.chords.join("  ") + (secCard.modelData.tab ? (secCard.modelData.chords.length ? "  · " : "") + "tab" : "")
+                                    summary: page.rev, secCard.modelData.chords.join("  ")
+                                             + (page.draft.strums.length > 1 && secCard.modelData.chords.length
+                                                ? "  · " + (page.draft.strums[Math.min(secCard.modelData.strum || 0, page.draft.strums.length - 1)].name || "batida") : "")
+                                             + (secCard.modelData.tab ? (secCard.modelData.chords.length ? "  · " : "") + "tab" : "")
                                     expanded: !!secCard.modelData._open
                                     onExpandedChanged: secCard.modelData._open = expanded
     
@@ -732,23 +690,68 @@ Rectangle {
                                         font.pixelSize: Theme.fontSize - 1
                                     }
     
-                                    RowLayout {
-                                        visible: page.draft.strums.length > 1
+                                    // Batida desta parte: escolher uma das batidas, criar uma só
+                                    // para ela, e mexer nos tempos aqui mesmo.
+                                    Column {
+                                        visible: secCard.modelData.chords.length > 0
                                         width: parent.width
+                                        spacing: 6
+                                        readonly property int si: page.rev, Math.min(secCard.modelData.strum || 0, page.draft.strums.length - 1)
+                                        readonly property var strum: page.rev, page.draft.strums[si]
+                                        readonly property int users: page.rev, page.draft.sections.filter(function (x) {
+                                            return x.chords.length > 0 && Math.min(x.strum || 0, page.draft.strums.length - 1) === si }).length
+                                        id: partStrum
                                         Text {
-                                            Layout.fillWidth: true
-                                            text: "Batida"
+                                            text: "Batida desta parte"
                                             color: Theme.text
                                             font.family: Theme.fontFamily
                                             font.pixelSize: Theme.fontSize
+                                            font.weight: Font.DemiBold
                                         }
-                                        SegmentedControl {
-                                            model: page.draft.strums.map(function (s, i) { return { value: String(i), label: String(i + 1) } })
-                                            current: String(secCard.modelData.strum || 0)
-                                            onActivated: (v) => { secCard.modelData.strum = Number(v); page.bump() }
+                                        Flow {
+                                            width: parent.width
+                                            spacing: 6
+                                            Repeater {
+                                                model: page.rev, page.draft.strums.slice()
+                                                AppButton {
+                                                    required property var modelData
+                                                    required property int index
+                                                    text: modelData.name || ("Batida " + (index + 1))
+                                                    suggested: index === partStrum.si
+                                                    onClicked: { secCard.modelData.strum = index; page.bump() }
+                                                }
+                                            }
+                                            AppButton {
+                                                text: "Batida só desta parte"
+                                                iconName: "add"
+                                                flat: true
+                                                onClicked: {
+                                                    var c = JSON.parse(JSON.stringify(partStrum.strum || page.defaultStrum()))
+                                                    c.name = secCard.modelData.name || ("Batida " + (page.draft.strums.length + 1))
+                                                    page.draft.strums.push(c)
+                                                    secCard.modelData.strum = page.draft.strums.length - 1
+                                                    page.bump()
+                                                }
+                                            }
+                                        }
+                                        StrumSlots {
+                                            width: parent.width
+                                            slotW: 44
+                                            strum: partStrum.strum
+                                            rev: page.rev
+                                            onChanged: page.bump()
+                                        }
+                                        Text {
+                                            visible: partStrum.users > 1
+                                            width: parent.width
+                                            wrapMode: Text.WordWrap
+                                            text: "Essa batida vale para " + partStrum.users + " partes. Para mudar só esta, toque em \"Batida só desta parte\"."
+                                            color: Theme.textDim
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontSize - 2
                                         }
                                     }
-    
+
                                     AppTextArea {
                                         visible: secCard.showTab
                                         width: parent.width
@@ -931,8 +934,8 @@ Rectangle {
                                         }
                                         AppButton {
                                             enabled: stringRow.fret > 0
-                                            text: stringRow.finger > 0 ? "dedo " + stringRow.finger : "dedo –"
-                                            onClicked: { voicingCard.v.fingers[stringRow.s] = (stringRow.finger + 1) % 5; page.bump() }
+                                            text: stringRow.finger === 5 ? "polegar" : stringRow.finger > 0 ? "dedo " + stringRow.finger : "dedo –"
+                                            onClicked: { voicingCard.v.fingers[stringRow.s] = (stringRow.finger + 1) % 6; page.bump() }
                                         }
                                     }
                                 }

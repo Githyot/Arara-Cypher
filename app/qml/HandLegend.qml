@@ -6,17 +6,18 @@ import AraraCypher
 Item {
     id: root
     property real zoom: 1
-    implicitWidth: 92 * zoom
+    implicitWidth: 100 * zoom
     implicitHeight: 172 * zoom
 
     Canvas {
         id: canvas
-        width: 92; height: 108
+        width: 100; height: 108
         scale: root.zoom
         transformOrigin: Item.TopLeft
         onPaint: {
             var ctx = getContext("2d")
             ctx.reset()
+            ctx.translate(8, 0)
             var skin = Theme.dark ? "#3d3846" : "#f6f5f4"
             var edge = Theme.textDim
             function rr(x, y, w, h, r) {
@@ -46,9 +47,9 @@ Item {
             ctx.translate(14, 74); ctx.rotate(-0.75)
             rr(-6, -30, 13, 34, 6.5)
             ctx.fillStyle = skin; ctx.fill()
-            ctx.strokeStyle = edge; ctx.lineWidth = 2; ctx.stroke()
+            ctx.strokeStyle = Theme.fingerColors[5]; ctx.lineWidth = 2.5; ctx.stroke()
             ctx.restore()
-            ctx.fillStyle = edge
+            ctx.fillStyle = Theme.fingerColors[5]
             ctx.font = "bold 11px sans-serif"
             ctx.fillText("P", 1, 62)
             // Palma.
@@ -64,14 +65,14 @@ Item {
     }
     Column {
         y: 110 * root.zoom
-        x: 18 * root.zoom
+        x: 26 * root.zoom
         Repeater {
             model: ["1 indicador", "2 médio", "3 anelar", "4 mínimo", "P polegar"]
             Text {
                 required property string modelData
                 required property int index
                 text: modelData
-                color: index < 4 ? Theme.fingerColors[index + 1] : Theme.textDim
+                color: Theme.fingerColors[index + 1]
                 font.family: Theme.fontFamily
                 font.pixelSize: 11 * root.zoom
                 font.bold: true

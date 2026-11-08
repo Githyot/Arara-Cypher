@@ -22,6 +22,10 @@ Item {
     property var counts: []
     property bool showStringNames: true
     property bool dashes: true        // traços das cordas (a tab comprida desenha linhas inteiras)
+    property bool editing: false      // tocar numa casa ou numa seta para mudar
+    property int selString: -1        // corda escolhida para editar (realçada)
+    signal noteClicked(int string)
+    signal stepClicked(int step)
 
     readonly property real cellW: 22
     readonly property real rowH: 20
@@ -71,10 +75,27 @@ Item {
             height: root.rowH
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
-            text: code === "" ? "" : code === "U" ? "↑" : "↓"
-            color: code === "X" ? Theme.textDim : Theme.chord
+            text: code === "" ? (root.editing ? "·" : "") : code === "U" ? "↑" : code === "X" && root.editing ? "×" : "↓"
+            color: code === "X" || code === "" ? Theme.textDim : Theme.chord
             font.pixelSize: 17
             font.bold: true
+            Rectangle {
+                visible: root.editing
+                anchors.fill: parent
+                anchors.margins: 1
+                radius: 4
+                color: "transparent"
+                border.width: 1
+                border.color: Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, arrowMouse.containsMouse ? 0.9 : 0.3)
+            }
+            MouseArea {
+                id: arrowMouse
+                anchors.fill: parent
+                enabled: root.editing
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.stepClicked(parent.index)
+            }
         }
     }
 
@@ -130,6 +151,22 @@ Item {
                     width: root.cellW
                     height: root.rowH
 
+                    // Realce da corda escolhida e área de toque no modo de edição.
+                    Rectangle {
+                        visible: root.editing && (root.selString === stringRow.string || cellMouse.containsMouse)
+                        anchors.fill: parent
+                        radius: 4
+                        color: Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b,
+                                       root.selString === stringRow.string ? 0.22 : 0.12)
+                    }
+                    MouseArea {
+                        id: cellMouse
+                        anchors.fill: parent
+                        enabled: root.editing
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.noteClicked(stringRow.string)
+                    }
                     // Linha da corda (tracejada, como nas aulas).
                     Rectangle {
                         visible: root.dashes && cell.value === null

@@ -126,7 +126,7 @@ Item {
             y: root.shape ? root.topPad + (f - root.shape.base + 0.5) * root.cellH - d / 2 + root.line / 2 : 0
             Text {
                 anchors.centerIn: parent
-                text: dot.finger > 0 ? dot.finger : ""
+                text: dot.finger === 5 ? "P" : dot.finger > 0 ? dot.finger : ""
                 color: "#ffffff"
                 font.family: Theme.fontFamily
                 font.pixelSize: 14

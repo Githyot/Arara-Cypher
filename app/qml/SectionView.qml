@@ -30,6 +30,20 @@ Flow {
         return song.voicings[token]
     }
 
+    // Quadros do mesmo tamanho, dois (ou mais, em tela larga) por linha.
+    readonly property int cols: Math.max(1, Math.floor((width + spacing) / (330 * zoom + spacing)))
+    readonly property real boxW: (width - (cols - 1) * spacing) / cols
+    // Quadro fechado (só o braço): menor, vários por linha, mesmo tamanho.
+    readonly property int smallCols: Math.max(1, Math.floor((width + spacing) / (190 * zoom + spacing)))
+    readonly property real smallW: (width - (smallCols - 1) * spacing) / smallCols
+    // Largura de cada toque para um pedaço caber no quadro (18 a 24).
+    function slotFor(events, bars, w) {
+        return Math.max(18, Math.min(24, (w / zoom - 68 - bars * 12) / Math.max(1, events)))
+    }
+    function fitsBox(events, bars) {
+        return (68 + events * 18 + bars * 12) * zoom <= boxW - 16
+    }
+
     function t(name) { return Music.transposeChord(name, semitones) }
 
     // Pedaços da tab: [{ name, tab, events }] na ordem.
@@ -76,7 +90,7 @@ Flow {
     // Tab (pauta + TAB) da batida tocada num acorde: cada tempo vira um
     // toque com as cordas que soam e a seta embaixo. Usa as casas escritas
     // à mão no compasso (cells) por cima da forma.
-    function strumTabText(i, token) {
+    function strumEvents(i, token) {
         var shape = Examples.shape(Examples.chordName(token), semitones, song ? Examples.voicing(song, token) : null) || Examples.blankShape()
         var pat = patternOf(i), cells = cellsOf(i)
         var events = []
@@ -96,8 +110,39 @@ Flow {
             }
             if (notes.length) events.push({ notes: notes, arrow: Examples.strokeUp(code) ? "U" : "D" })
         }
-        if (!events.length) return ""
-        return Music.renderTab(JSON.stringify([{ chords: [], events: events, bars: [] }]))
+        return events
+    }
+    function strumTabText(i, token) {
+        var events = strumEvents(i, token)
+        return events.length ? Music.renderTab(JSON.stringify([{ chords: [], events: events, bars: [] }])) : ""
+    }
+    // A parte inteira, contínua: a tab dela, ou (sem tab) a batida de cada
+    // acorde em seguida, com o nome em cima e barra entre um e outro.
+    readonly property string fullTab: {
+        rev
+        if (!section) return ""
+        if (section.tab) return section.tab
+        var sys = { chords: [], events: [], bars: [] }
+        var cs = section.chords || []
+        for (var i = 0; i < cs.length; ++i) {
+            var ev = strumEvents(i, cs[i])
+            if (!ev.length) continue
+            if (sys.events.length) sys.bars.push(sys.events.length)
+            sys.chords.push({ at: sys.events.length, name: cs[i] })
+            sys.events = sys.events.concat(ev)
+        }
+        return sys.events.length ? Music.renderTab(JSON.stringify([sys])) : ""
+    }
+
+    // ---- A parte inteira primeiro (partitura contínua) ----
+    TabScore {
+        width: root.width
+        height: implicitHeight
+        tab: root.fullTab
+        showChords: true
+        semitones: root.semitones
+        keyName: root.keyName
+        zoom: root.zoom
     }
 
     // ---- Com tab: pedaços ----
@@ -109,10 +154,22 @@ Flow {
             readonly property string name: modelData.name
             readonly property var voicing: root.rev, root.song ? Examples.voicing(root.song, name) : null
             property bool open: false
-            width: Math.max(diag.visible ? diag.implicitWidth * root.zoom + 16 : 0, score.width + 16, title.implicitWidth + 24, open ? segEditor.implicitWidth + 16 : 0)
+            // Pedaço comprido demais para o quadro ocupa a linha toda.
+            readonly property bool wide: !root.fitsBox(modelData.events, modelData.bars)
+            // Só o braço; clicar no quadro mostra a partitura deste trecho.
+            // Sem nome de acorde não há braço: mostra a partitura direto.
+            property bool showScore: name === ""
+            width: !showScore && !open ? root.smallW
+                 : wide || (open && segEditor.implicitWidth + 16 > root.boxW) ? root.width : root.boxW
             height: col.implicitHeight + 16
             radius: Theme.radiusSmall
             color: Qt.rgba(Theme.chord.r, Theme.chord.g, Theme.chord.b, Theme.dark ? 0.12 : 0.07)
+            MouseArea {
+                anchors.fill: parent
+                enabled: seg.name !== ""
+                cursorShape: Qt.PointingHandCursor
+                onClicked: seg.showScore = !seg.showScore
+            }
             Column {
                 id: col
                 x: 8; y: 8
@@ -157,10 +214,22 @@ Flow {
                     rev: root.rev
                     onChanged: root.edited()
                 }
+                Text {
+                    visible: seg.name !== ""
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: seg.showScore ? "▴ esconder partitura" : "▾ ver partitura"
+                    color: Theme.textDim
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSize - 2
+                }
                 TabScore {
                     id: score
+                    visible: seg.showScore && events.length > 0
                     // Pedaço comprido quebra em linhas dentro da largura da tela.
-                    width: Math.min(root.width - 16, (48 + seg.modelData.events * 24 + seg.modelData.bars * 12 + 20) * root.zoom)
+                    readonly property real avail: seg.width - 16
+                    slotW: seg.wide ? 24 : root.slotFor(seg.modelData.events, seg.modelData.bars, avail)
+                    width: Math.min(avail, (68 + seg.modelData.events * slotW + seg.modelData.bars * 12) * root.zoom)
+                    anchors.horizontalCenter: parent.horizontalCenter
                     height: implicitHeight
                     tab: seg.modelData.tab
                     keyName: root.keyName
@@ -180,10 +249,17 @@ Flow {
             readonly property string name: Examples.chordName(modelData)
             readonly property var voicing: root.rev, root.song ? Examples.voicing(root.song, modelData) : null
             property bool open: false
-            width: Math.max(big.implicitWidth * root.zoom, beatScore.width, label.implicitWidth, open ? boxEditor.implicitWidth : 0) + 24
+            property bool showScore: false
+            width: !showScore && !open ? root.smallW
+                 : open && boxEditor.implicitWidth + 16 > root.boxW ? root.width : root.boxW
             height: inner.implicitHeight + 16
             radius: Theme.radiusSmall
             color: Qt.rgba(Theme.chord.r, Theme.chord.g, Theme.chord.b, Theme.dark ? 0.12 : 0.07)
+            MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: box.showScore = !box.showScore
+            }
             Column {
                 id: inner
                 x: 8; y: 8
@@ -227,10 +303,20 @@ Flow {
                     onChanged: root.edited()
                 }
                 // A batida no estilo da tab: pauta + TAB com as setas.
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: box.showScore ? "▴ esconder partitura" : "▾ ver partitura"
+                    color: Theme.textDim
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSize - 2
+                }
                 TabScore {
                     id: beatScore
+                    visible: box.showScore && events.length > 0
                     readonly property string text: root.rev, root.strumTabText(box.index, box.modelData)
-                    width: Math.min(root.width - 16, (48 + root.patternOf(box.index).length * 24 + 20) * root.zoom)
+                    readonly property int steps: root.patternOf(box.index).filter(function (c) { return c !== "" }).length
+                    slotW: root.slotFor(steps, 0, box.width - 16)
+                    width: Math.min(box.width - 16, (68 + steps * slotW) * root.zoom)
                     height: implicitHeight
                     anchors.horizontalCenter: parent.horizontalCenter
                     tab: text

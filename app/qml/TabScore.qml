@@ -59,7 +59,8 @@ Canvas {
     readonly property real gap: 9
     readonly property real tabGap: 11
     readonly property real clefW: 48
-    readonly property real slotW: 24
+    property real slotW: 24            // largura de cada toque (menor para caber num quadro)
+    onSlotWChanged: requestPaint()
     readonly property real barW: 12
     // Nota mais aguda da tab (passo diatônico), para dar espaço às notas e
     // hastes que passam por cima da pauta.
@@ -192,11 +193,17 @@ Canvas {
             if (showStaff) { ctx.beginPath(); ctx.moveTo(rowEnd - 0.5, staffTop); ctx.lineTo(rowEnd - 0.5, staffBottom); ctx.stroke() }
             ctx.beginPath(); ctx.moveTo(rowEnd - 0.5, tabTop); ctx.lineTo(rowEnd - 0.5, tabBottom); ctx.stroke()
             if (showStaff) drawClef(ctx, ink, 22, staffTop)
-            ctx.fillStyle = ink
-            ctx.font = "bold 11px sans-serif"
-            ctx.fillText("T", 30, tabTop + tabGap * 1.4)
-            ctx.fillText("A", 30, tabTop + tabGap * 2.7)
-            ctx.fillText("B", 30, tabTop + tabGap * 4.0)
+            // Nome de cada corda no começo da linha dela (e em cima, E embaixo).
+            ctx.font = "bold 10px monospace"
+            var names = ["e", "B", "G", "D", "A", "E"]
+            for (var sn = 0; sn < 6; ++sn) {
+                var ny = Math.round(tabTop + sn * tabGap)
+                var nw = ctx.measureText(names[sn]).width
+                ctx.fillStyle = Theme.card
+                ctx.fillRect(30 - 2, ny - 5, nw + 4, 10)
+                ctx.fillStyle = Theme.chord
+                ctx.fillText(names[sn], 30, ny + 4)
+            }
 
             var x = clefW
             var stems = []

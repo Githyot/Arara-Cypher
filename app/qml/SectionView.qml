@@ -154,6 +154,7 @@ Flow {
             readonly property string name: modelData.name
             readonly property var voicing: root.rev, root.song ? Examples.voicing(root.song, name) : null
             property bool open: false
+            property string applied: ""
             // Pedaço comprido demais para o quadro ocupa a linha toda.
             readonly property bool wide: !root.fitsBox(modelData.events, modelData.bars)
             // Só o braço; clicar no quadro mostra a partitura deste trecho.
@@ -205,6 +206,26 @@ Flow {
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: seg.open ? "Fechar editor de braço" : "Editar braço"
                     onClicked: { if (!seg.open) root.ownVoicing(seg.name); seg.open = !seg.open }
+                }
+                AppButton {
+                    visible: root.editing && seg.open && !!root.section && !!root.section.tab
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: "Aplicar esta forma na tab"
+                    onClicked: {
+                        var v = root.ownVoicing(seg.name)
+                        var r = Examples.applyShapeToTab(root.section.tab, seg.name, v.frets)
+                        root.section.tab = r.tab
+                        seg.applied = r.changed ? r.changed + " toques mudaram na tab." : "A tab já está com essa forma."
+                        root.edited()
+                    }
+                }
+                Text {
+                    visible: root.editing && seg.open && seg.applied !== ""
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: seg.applied
+                    color: Theme.success
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSize - 1
                 }
                 ChordEditor {
                     id: segEditor

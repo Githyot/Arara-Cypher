@@ -902,9 +902,32 @@ Rectangle {
                                 text: "Usar a do app"
                                 onClicked: { delete page.draft.voicings[page.editingChord]; page.editingChord = ""; page.bump() }
                             }
+                            AppButton {
+                                // A tab manda: reescreve os toques desse acorde com a forma nova.
+                                text: "Aplicar na tab"
+                                onClicked: {
+                                    var n = 0
+                                    page.draft.sections.forEach(function (sec) {
+                                        if (!sec.tab) return
+                                        var r = Examples.applyShapeToTab(sec.tab, page.editingChord, voicingCard.v.frets)
+                                        sec.tab = r.tab; n += r.changed
+                                    })
+                                    page.message = n ? n + " toques de " + page.editingChord + " mudaram na tab." : "Nenhum toque marcado com " + page.editingChord + " precisou mudar."
+                                    page.bump()
+                                }
+                            }
                             AppButton { text: "Pronto"; suggested: true; onClicked: page.editingChord = "" }
                         }
 
+                        Text {
+                            visible: page.message !== ""
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            text: page.message
+                            color: Theme.success
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSize - 1
+                        }
                         // Editor de braço: clicar na casa põe o dedo, em cima troca O/X.
                         ChordEditor {
                             width: parent.width

@@ -67,6 +67,37 @@ QtObject {
     }
 
     // Nome que aparece na tela (sem o apelido "@...").
+    // Reescreve os toques da tab marcados com esse acorde (até o próximo
+    // acorde marcado) com as casas da forma nova: cada nota fica na mesma
+    // corda e pega a casa da forma; corda que a forma não toca sai do toque.
+    // Abafadas (x) e notas com técnica ficam como estão. Devolve o texto novo
+    // e quantos toques mudaram: { tab, changed }.
+    function applyShapeToTab(tab, token, frets) {
+        if (!tab) return { tab: tab, changed: 0 }
+        var systems = JSON.parse(Music.tabModel(tab))
+        var cur = "", changed = 0
+        for (var s = 0; s < systems.length; ++s) {
+            var sys = systems[s]
+            var marks = (sys.chords || []).slice().sort(function (a, b) { return a.at - b.at })
+            var m = 0
+            for (var e = 0; e < sys.events.length; ++e) {
+                while (m < marks.length && marks[m].at <= e) { cur = marks[m].name; m++ }
+                if (cur !== token) continue
+                var ev = sys.events[e], out = [], diff = false
+                for (var k = 0; k < ev.notes.length; ++k) {
+                    var n = ev.notes[k]
+                    if (n.fret === 255 || n.tech) { out.push(n); continue }
+                    var f = frets[n.string]
+                    if (f === undefined || f < 0) { diff = true; continue }
+                    if (f !== n.fret) diff = true
+                    out.push({ string: n.string, fret: f })
+                }
+                if (diff && out.length) { ev.notes = out; changed++ }
+            }
+        }
+        return { tab: changed ? Music.renderTab(JSON.stringify(systems)) : tab, changed: changed }
+    }
+
     function chordName(token) {
         var at = token.indexOf("@")
         return at < 0 ? token : token.substring(0, at)

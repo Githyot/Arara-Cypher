@@ -19,7 +19,9 @@ Item {
     readonly property real gridW: cellW * 5
     readonly property real gridH: cellH * frets
     readonly property real leftPad: 46
-    readonly property real topPad: 10
+    // Capo desenhado em cima do braço (forma com "capo": n), como nos vídeos.
+    readonly property int capo: voicing && voicing.capo ? voicing.capo : 0
+    readonly property real topPad: 10 + (capo > 0 ? 30 : 0)
     readonly property color gridColor: Theme.dark ? "#d9d9d9" : "#5e5c64"
 
     readonly property var barre: {
@@ -37,6 +39,35 @@ Item {
     implicitWidth: leftPad + gridW + line + 10
     implicitHeight: topPad + gridH + 40
     visible: shape !== null
+
+    // Capo: barra escura com "CAPO" e a casa ao lado.
+    Rectangle {
+        visible: root.capo > 0
+        x: root.leftPad - 6
+        y: 4
+        width: root.gridW + root.line + 12
+        height: 20
+        radius: 4
+        color: Theme.dark ? "#f0f0f0" : "#241f31"
+        Text {
+            anchors.centerIn: parent
+            text: "C A P O"
+            color: Theme.dark ? "#241f31" : "#ffffff"
+            font.family: Theme.fontFamily
+            font.pixelSize: 12
+            font.bold: true
+        }
+    }
+    Text {
+        visible: root.capo > 0
+        text: root.capo + "ª"
+        color: Theme.text
+        font.family: Theme.fontFamily
+        font.pixelSize: 16
+        font.bold: true
+        x: root.leftPad - 10 - width
+        y: 4 + 10 - height / 2
+    }
 
     // Topo do braço: grosso quando o acorde começa na pestana do violão.
     Rectangle {

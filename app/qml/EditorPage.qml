@@ -69,11 +69,15 @@ Rectangle {
         rev
         var out = []
         if (!draft) return out
-        for (var i = 0; i < draft.sections.length; ++i)
-            for (var j = 0; j < draft.sections[i].chords.length; ++j) {
-                var c = draft.sections[i].chords[j]
-                if (out.indexOf(c) < 0 && Music.isChord(Examples.chordName(c))) out.push(c)
-            }
+        var add = function (c) { if (c && out.indexOf(c) < 0 && Music.isChord(Examples.chordName(c))) out.push(c) }
+        for (var i = 0; i < draft.sections.length; ++i) {
+            var sec = draft.sections[i]
+            for (var j = 0; j < sec.chords.length; ++j) add(sec.chords[j])
+            // Também os acordes marcados na tab (Acorde neste toque).
+            if (sec.tab) JSON.parse(Music.tabModel(sec.tab)).forEach(function (sys) {
+                (sys.chords || []).forEach(function (m) { add(m.name) })
+            })
+        }
         return out
     }
 

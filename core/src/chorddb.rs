@@ -4,6 +4,8 @@
 //! A chave é `fundamental|sufixo|baixo`, com as notas em semitons (C = 0).
 
 use std::collections::HashMap;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 use crate::chord::Chord;
@@ -78,25 +80,82 @@ fn to_shape(e: &Entry, root: u8) -> ChordShape {
     }
 }
 
-/// Todas as formas do banco para o acorde (vazio se não tiver).
-pub fn shapes(chord: &Chord) -> Vec<ChordShape> {
-    let root = chord.root.semitone();
+fn key_of(chord: &Chord) -> String {
     let bass = chord
         .bass
         .map(|b| b.semitone().to_string())
         .unwrap_or_default();
-    let key = format!("{root}|{}|{bass}", canon(&chord.suffix));
-    db().get(&key)
+    format!("{}|{}|{bass}", chord.root.semitone(), canon(&chord.suffix))
+}
+
+/// Formas que a pessoa salvou como opção ("Salvar como opção"), no mesmo
+/// formato do banco, em `$XDG_DATA_HOME/araracypher/bracos.json`.
+fn user_path() -> PathBuf {
+    let songs = crate::library::default_dir();
+    songs
+        .parent()
+        .map(|p| p.join("bracos.json"))
+        .unwrap_or_else(|| PathBuf::from("bracos.json"))
+}
+
+fn load_user(path: &Path) -> HashMap<String, Vec<Entry>> {
+    fs::read_to_string(path)
+        .ok()
+        .and_then(|t| serde_json::from_str(&t).ok())
+        .unwrap_or_default()
+}
+
+/// Guarda a forma como mais uma opção do acorde (casas contadas sem capo).
+/// Devolve falso se o nome não é acorde ou não deu para gravar.
+pub fn save_user_at(path: &Path, name: &str, frets: [i8; 6], fingers: [u8; 6]) -> bool {
+    let Ok(chord) = name.parse::<Chord>() else {
+        return false;
+    };
+    let mut all = load_user(path);
+    let list = all.entry(key_of(&chord)).or_default();
+    if !list.iter().any(|e| e.0 == frets) {
+        list.push((frets, fingers));
+    }
+    if let Some(dir) = path.parent() {
+        let _ = fs::create_dir_all(dir);
+    }
+    serde_json::to_string(&all)
+        .ok()
+        .is_some_and(|t| fs::write(path, t).is_ok())
+}
+
+pub fn save_user(name: &str, frets: [i8; 6], fingers: [u8; 6]) -> bool {
+    save_user_at(&user_path(), name, frets, fingers)
+}
+
+/// Formas salvas pela pessoa para o acorde.
+pub fn user_shapes(chord: &Chord) -> Vec<ChordShape> {
+    let root = chord.root.semitone();
+    load_user(&user_path())
+        .get(&key_of(chord))
         .map(|v| v.iter().map(|e| to_shape(e, root)).collect())
         .unwrap_or_default()
 }
 
-/// Formas do banco em JSON (lista), para o QML.
+/// Todas as formas do banco para o acorde (vazio se não tiver).
+pub fn shapes(chord: &Chord) -> Vec<ChordShape> {
+    let root = chord.root.semitone();
+    db().get(&key_of(chord))
+        .map(|v| v.iter().map(|e| to_shape(e, root)).collect())
+        .unwrap_or_default()
+}
+
+/// Formas para o QML (lista JSON): primeiro as salvas pela pessoa (com
+/// `"mine":true`), depois as do banco.
 pub fn shapes_json(name: &str) -> String {
-    let list: Vec<String> = name
-        .parse::<Chord>()
-        .map(|c| shapes(&c).iter().map(ChordShape::to_json).collect())
-        .unwrap_or_default();
+    let Ok(c) = name.parse::<Chord>() else {
+        return "[]".into();
+    };
+    let mut list: Vec<String> = user_shapes(&c)
+        .iter()
+        .map(|s| s.to_json().replacen('{', "{\"mine\":true,", 1))
+        .collect();
+    list.extend(shapes(&c).iter().map(ChordShape::to_json));
     format!("[{}]", list.join(","))
 }
 
@@ -120,5 +179,26 @@ mod tests {
         assert!(first("C9").is_some());
         assert!(shapes(&"Bm".parse().unwrap()).len() > 1);
         assert!(!db().is_empty());
+    }
+
+    #[test]
+    fn saves_user_options() {
+        let dir = std::env::temp_dir().join(format!("arara-bracos-{}", std::process::id()));
+        let path = dir.join("bracos.json");
+        assert!(save_user_at(
+            &path,
+            "Em7(9)",
+            [-1, -1, 12, 11, 12, -1],
+            [0, 0, 2, 1, 3, 0]
+        ));
+        assert!(save_user_at(
+            &path,
+            "Em7(9)",
+            [-1, -1, 12, 11, 12, -1],
+            [0, 0, 2, 1, 3, 0]
+        ));
+        let all = load_user(&path);
+        assert_eq!(all.values().map(Vec::len).sum::<usize>(), 1);
+        let _ = fs::remove_dir_all(dir);
     }
 }

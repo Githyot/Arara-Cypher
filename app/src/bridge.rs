@@ -30,6 +30,12 @@ pub mod qobject {
         #[cxx_name = "chordShapes"]
         fn chord_shapes(&self, name: &QString, semitones: i32) -> QString;
 
+        /// Salva uma forma ({frets, fingers}, casas sem capo) como mais uma opção
+        /// do acorde no Banco de Braços do app.
+        #[qinvokable]
+        #[cxx_name = "saveShape"]
+        fn save_shape(&self, name: &QString, json: &QString) -> bool;
+
         /// Verdadeiro se o texto é um nome de acorde válido.
         #[qinvokable]
         #[cxx_name = "isChord"]
@@ -163,6 +169,22 @@ impl qobject::Music {
     pub fn chord_shapes(&self, name: &QString, semitones: i32) -> QString {
         let transposed = chord::transpose_name(&name.to_string(), semitones);
         QString::from(chorddb::shapes_json(&transposed).as_str())
+    }
+
+    pub fn save_shape(&self, name: &QString, json: &QString) -> bool {
+        let v: serde_json::Value = serde_json::from_str(&json.to_string()).unwrap_or_default();
+        let get = |k: &str| -> Option<Vec<i64>> {
+            v.get(k)?.as_array()?.iter().map(|x| x.as_i64()).collect()
+        };
+        let (Some(fr), Some(fi)) = (get("frets"), get("fingers")) else {
+            return false;
+        };
+        if fr.len() != 6 || fi.len() != 6 {
+            return false;
+        }
+        let frets: [i8; 6] = std::array::from_fn(|i| fr[i].clamp(-1, 24) as i8);
+        let fingers: [u8; 6] = std::array::from_fn(|i| fi[i].clamp(0, 5) as u8);
+        chorddb::save_user(&name.to_string(), frets, fingers)
     }
 
     pub fn is_chord(&self, name: &QString) -> bool {

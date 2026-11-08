@@ -15,7 +15,24 @@ Column {
     signal changed()
 
     // Banco de Braços: outras formas conhecidas deste acorde.
-    readonly property var bank: chord ? JSON.parse(Music.chordShapes(Examples.chordName(chord), 0)) : []
+    property int bankRev: 0
+    readonly property var bank: bankRev, chord ? JSON.parse(Music.chordShapes(Examples.chordName(chord), 0)) : []
+    property string saveMsg: ""
+    // Guarda a forma atual como mais uma opção do acorde no Banco de Braços
+    // (casas contadas sem o capo da música, como as do banco).
+    function saveToBank() {
+        if (!voicing || !chord) return
+        var fr = voicing.frets.map(function (f) { return f > 0 ? Math.max(1, f - capo) : f })
+        var ok = Music.saveShape(Examples.chordName(chord), JSON.stringify({ frets: fr, fingers: voicing.fingers || [0, 0, 0, 0, 0, 0] }))
+        saveMsg = ok ? "Salva como opção de " + Examples.chordName(chord) + " no Banco de Braços." : "Não deu para salvar."
+        bankRev++
+    }
+    // Capo desenhado no braço (como nos vídeos): 0 = sem capo.
+    function setCapo(n) {
+        if (!voicing) return
+        voicing.capo = Math.max(0, Math.min(12, n))
+        touch()
+    }
     property int bankIndex: -1
     onChordChanged: bankIndex = -1
     function useBank(i) {
@@ -32,6 +49,7 @@ Column {
     property int localRev: 0
     readonly property int allRev: rev + localRev
     readonly property var frets: allRev, voicing ? voicing.frets.slice() : [-1, -1, -1, -1, -1, -1]
+    readonly property int capoShown: allRev, voicing && voicing.capo ? voicing.capo : 0
     readonly property var fingers: allRev, voicing ? (voicing.fingers || [0, 0, 0, 0, 0, 0]).slice() : [0, 0, 0, 0, 0, 0]
     // Primeira casa do desenho: segue a forma, mas dá para mudar.
     property int base: 1
@@ -80,12 +98,51 @@ Column {
         Text {
             height: Theme.controlHeight
             verticalAlignment: Text.AlignVCenter
-            text: root.bankIndex < 0 ? root.bank.length + " formas" : "forma " + (root.bankIndex + 1) + " de " + root.bank.length
+            text: root.bankIndex < 0 ? root.bank.length + " formas"
+                 : "forma " + (root.bankIndex + 1) + " de " + root.bank.length + (root.bank[root.bankIndex].mine ? " (sua)" : "")
             color: Theme.text
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontSize - 1
         }
         AppButton { text: "▶"; onClicked: root.useBank(root.bankIndex + 1) }
+    }
+    Row {
+        spacing: 6
+        AppButton {
+            visible: root.chord !== ""
+            text: "Salvar como opção no Banco de Braços"
+            onClicked: root.saveToBank()
+        }
+        Text {
+            height: Theme.controlHeight
+            verticalAlignment: Text.AlignVCenter
+            text: root.saveMsg
+            color: Theme.success
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontSize - 1
+        }
+    }
+    // Capo no desenho.
+    Row {
+        spacing: 6
+        Text {
+            height: Theme.controlHeight
+            verticalAlignment: Text.AlignVCenter
+            text: "Capo no braço:"
+            color: Theme.textDim
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontSize - 1
+        }
+        AppButton { text: "−"; enabled: root.capoShown > 0; onClicked: root.setCapo(root.capoShown - 1) }
+        Text {
+            height: Theme.controlHeight
+            verticalAlignment: Text.AlignVCenter
+            text: root.capoShown > 0 ? root.capoShown + "ª casa" : "sem capo"
+            color: Theme.text
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontSize - 1
+        }
+        AppButton { text: "+"; onClicked: root.setCapo(root.capoShown + 1) }
     }
 
     // Dedo escolhido.
@@ -148,6 +205,22 @@ Column {
             x: root.leftPad - 2; y: root.topPad - 4
             width: root.cellW * 5 + 4; height: 5
             color: Theme.text
+        }
+        // Capo desenhado em cima do braço.
+        Rectangle {
+            visible: root.capoShown > 0
+            x: root.leftPad - 6; y: root.topPad - 12
+            width: root.cellW * 5 + 14; height: 14; radius: 3
+            color: Theme.dark ? "#f0f0f0" : "#241f31"
+            z: 2
+            Text {
+                anchors.centerIn: parent
+                text: "C A P O  " + root.capoShown + "ª"
+                color: Theme.dark ? "#241f31" : "#ffffff"
+                font.family: Theme.fontFamily
+                font.pixelSize: 10
+                font.bold: true
+            }
         }
         // Linhas das cordas e das casas.
         Repeater {

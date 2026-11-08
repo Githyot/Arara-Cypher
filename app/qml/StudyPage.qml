@@ -460,7 +460,13 @@ Rectangle {
                                 onClicked: {
                                     if (modelData.id === "quiz") { page.startQuiz(); return }
                                     page.laps = 0; page.lapStars = 0; page.rhythmResult = null
-                                    page.bpm = modelData.id === "practice" ? Math.max(50, Math.min(page.best("bpm") || 60, 120)) : 70
+                                    // Começa no recorde, ou no BPM da música (quando a cifra diz).
+                                    var songBpm = page.song.bpm || 0
+                                    if (!songBpm && page.song.strums)
+                                        for (var i = 0; i < page.song.strums.length; ++i) songBpm = songBpm || page.song.strums[i].bpm || 0
+                                    page.bpm = modelData.id === "practice"
+                                            ? (page.best("bpm") || songBpm || 60)
+                                            : (songBpm || 70)
                                     // Foco antes de trocar de tela: este botão some com a troca.
                                     keyCatcher.forceActiveFocus()
                                     page.mode = modelData.id

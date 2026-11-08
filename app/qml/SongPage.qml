@@ -1,14 +1,104 @@
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
+import QtMultimedia
+import Qt.labs.settings
 import AraraCypher
 
-// Visualização de uma cifra: seções com os acordes, tom e transposição.
-// Por enquanto lê as músicas de exemplo; o editor de verdade chega no passo 2.
+// Visualização de uma cifra: seções com os acordes, tom e transposição, e um
+// menu de opções (rolagem automática, colunas, capotraste, afinação, mostrar
+// tabs e batidas, metrônomo no BPM da música e pedal passador).
 Rectangle {
     id: page
     property var song
     property int semitones: 0
+    // Capotraste e afinação escolhidos aqui: mudam as formas, não o som.
+    readonly property int songCapo: song && song.capo ? song.capo : 0
+    property int capo: songCapo
+    property int tuning: 0              // semitons abaixo do padrão (0, 1, 2)
+    readonly property int shift: semitones + (songCapo - capo) + tuning
+
+    // Preferências da tela (valem para todas as músicas).
+    Settings {
+        id: prefs
+        category: "musica"
+        property int columns: 1
+        property bool showTabs: true
+        property bool showStrums: true
+        property int scrollSpeed: 3
+        property bool pedal: true
+    }
+    function restoreDefaults() {
+        prefs.columns = 1; prefs.showTabs = true; prefs.showStrums = true
+        prefs.scrollSpeed = 3; prefs.pedal = true
+        capo = songCapo; tuning = 0; semitones = 0
+        Theme.chordZoom = 1
+        viewMode = "tab"; fullScore = false
+        scrolling = false; metroVisible = false; metro.running = false
+        metro.bpm = songBpm
+    }
+
+    // ---- Rolagem automática ----
+    property bool scrolling: false
+    readonly property var scrollSpeeds: [0, 8, 14, 22, 32, 45, 62, 85]   // pixels por segundo
+    Timer {
+        interval: 30
+        repeat: true
+        running: page.scrolling
+        onTriggered: {
+            var max = flick.contentHeight - flick.height
+            if (flick.contentY >= max) { page.scrolling = false; return }
+            flick.contentY = Math.min(max, flick.contentY + page.scrollSpeeds[prefs.scrollSpeed] * 0.03)
+        }
+    }
+
+    // ---- Pedal passador / teclado: Page Down, seta para baixo ou direita avançam. ----
+    function page_(dir) {
+        var max = Math.max(0, flick.contentHeight - flick.height)
+        flick.contentY = Math.max(0, Math.min(max, flick.contentY + dir * flick.height * 0.8))
+    }
+    focus: true
+    Component.onCompleted: forceActiveFocus()
+    Keys.onPressed: (e) => {
+        if (!prefs.pedal) return
+        if (e.key === Qt.Key_PageDown || e.key === Qt.Key_Down || e.key === Qt.Key_Right) { page_(1); e.accepted = true }
+        else if (e.key === Qt.Key_PageUp || e.key === Qt.Key_Up || e.key === Qt.Key_Left) { page_(-1); e.accepted = true }
+    }
+
+    // ---- Metrônomo no BPM da música ----
+    readonly property int songBpm: {
+        if (song && song.bpm) return song.bpm
+        if (song && song.strums) for (var i = 0; i < song.strums.length; ++i) if (song.strums[i].bpm) return song.strums[i].bpm
+        return 80
+    }
+    property bool metroVisible: false
+    QtObject {
+        id: metro
+        property int bpm: page.songBpm
+        property bool running: false
+        property real t0: 0
+        property int beat: -1
+    }
+    SoundEffect { id: ticForte; source: Music.clickSound(true); volume: 0.9 }
+    SoundEffect { id: ticFraco; source: Music.clickSound(false); volume: 0.6 }
+    Timer {
+        interval: 5
+        repeat: true
+        running: metro.running
+        onTriggered: {
+            var n = Math.floor((Date.now() - metro.t0) / (60000 / metro.bpm))
+            if (n !== metro.beat) {
+                metro.beat = n
+                ;(n % 4 === 0 ? ticForte : ticFraco).play()
+            }
+        }
+    }
+    function toggleMetro() {
+        if (metro.running) { metro.running = false; return }
+        metro.t0 = Date.now()
+        metro.beat = -1
+        metro.running = true
+    }
     property string viewMode: "tab"   // "names" | "diagram" | "big" | "tab" | "score"
     property bool fullScore: false     // partitura da música inteira, em linhas
     readonly property bool showFullScore: viewMode === "score" && fullScore
@@ -94,7 +184,7 @@ Rectangle {
 
     color: Theme.window
 
-    function t(chord) { return Music.transposeChord(chord, semitones) }
+    function t(chord) { return Music.transposeChord(chord, shift) }
 
     ColumnLayout {
         anchors.fill: parent
@@ -109,15 +199,17 @@ Rectangle {
                 onClicked: page.edit()
             }
             AppButton {
-                visible: !!(page.song && page.song.video)
-                text: "Vídeo"
+                text: page.scrolling ? "Parar" : "Rolar"
                 flat: true
-                onClicked: Qt.openUrlExternally(page.song.video)
+                onClicked: page.scrolling = !page.scrolling
             }
             AppButton { text: "Voltar"; flat: true; onClicked: page.back() }
         }
 
         Flickable {
+            id: flick
+            // Rolar com a mão para a rolagem automática.
+            onMovementStarted: page.scrolling = false
 
             ScrollBar.vertical: AppScrollBar {}
             Layout.fillWidth: true
@@ -128,7 +220,7 @@ Rectangle {
             Column {
                 id: content
                 y: Theme.pagePadding
-                width: Math.min(parent.width - 2 * Theme.pagePadding, 720)
+                width: Math.min(parent.width - 2 * Theme.pagePadding, prefs.columns > 1 ? 1400 : 720)
                 x: (parent.width - width) / 2
                 spacing: 14
 
@@ -152,7 +244,8 @@ Rectangle {
                                 }
                                 Text {
                                     anchors.baseline: parent.children[0].baseline
-                                    text: page.song && page.song.capo ? "capo " + page.song.capo + "ª casa" : ""
+                                    text: (page.capo ? "capo " + page.capo + "ª casa" : (page.songCapo ? "sem capo" : ""))
+                                      + (page.tuning ? " · " + (page.tuning === 1 ? "½ tom abaixo" : "1 tom abaixo") : "")
                                     color: Theme.textDim
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Theme.fontSize - 1
@@ -204,6 +297,15 @@ Rectangle {
                             current: String(Theme.chordZoom)
                             onActivated: (v) => Theme.chordZoom = Number(v)
                         }
+                        AppButton {
+                            text: "Metrônomo"
+                            onClicked: page.metroVisible = !page.metroVisible
+                        }
+                        AppButton {
+                            visible: !!(page.song && page.song.video)
+                            text: "Vídeo"
+                            onClicked: Qt.openUrlExternally(page.song.video)
+                        }
                         SegmentedControl {
                             visible: page.viewMode === "score"
                             model: [{ value: "chord", label: "Por acorde" },
@@ -214,10 +316,113 @@ Rectangle {
                     }
                 }
 
+                // ---- Opções (como o menu dos apps de cifra) ----
+                Collapsible {
+                    id: optionsGroup
+                    width: parent.width
+                    title: "Opções"
+                    expanded: false
+                    summary: [prefs.columns > 1 ? prefs.columns + " colunas" : "",
+                              page.capo !== page.songCapo ? "capo " + page.capo : "",
+                              page.tuning ? "afinação " + (page.tuning === 1 ? "½ tom abaixo" : "1 tom abaixo") : "",
+                              !prefs.showTabs ? "sem tabs" : "", !prefs.showStrums ? "sem batidas" : "",
+                              "rolagem " + prefs.scrollSpeed, page.songBpm + " BPM"]
+                             .filter(function (x) { return x !== "" }).join(" · ")
+                    Card {
+                        width: parent.width
+                        component Label: Text {
+                            Layout.fillWidth: true
+                            color: Theme.text
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSize
+                            wrapMode: Text.WordWrap
+                        }
+                        component Hint: Text {
+                            color: Theme.textDim
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSize - 1
+                        }
+                        RowLayout {
+                            width: parent.width
+                            Label { text: "Rolagem automática" }
+                            AppButton { iconName: "remove"; onClicked: prefs.scrollSpeed = Math.max(1, prefs.scrollSpeed - 1) }
+                            Hint { text: "velocidade " + prefs.scrollSpeed; Layout.preferredWidth: 90; horizontalAlignment: Text.AlignHCenter }
+                            AppButton { iconName: "add"; onClicked: prefs.scrollSpeed = Math.min(7, prefs.scrollSpeed + 1) }
+                            AppButton { text: page.scrolling ? "Parar" : "Rolar"; suggested: !page.scrolling; onClicked: page.scrolling = !page.scrolling }
+                        }
+                        RowLayout {
+                            width: parent.width
+                            Label { text: "Dividir em colunas" }
+                            SegmentedControl {
+                                model: [{ value: "1", label: "1" }, { value: "2", label: "2" }, { value: "3", label: "3" }]
+                                current: String(prefs.columns)
+                                onActivated: (v) => prefs.columns = Number(v)
+                            }
+                        }
+                        RowLayout {
+                            width: parent.width
+                            Label { text: "Capotraste" + (page.capo !== page.songCapo ? " (as formas mudam, o som continua o mesmo)" : "") }
+                            AppButton { iconName: "remove"; onClicked: page.capo = Math.max(0, page.capo - 1) }
+                            Hint { text: page.capo ? page.capo + "ª casa" : "sem capo"; Layout.preferredWidth: 80; horizontalAlignment: Text.AlignHCenter }
+                            AppButton { iconName: "add"; onClicked: page.capo = Math.min(11, page.capo + 1) }
+                        }
+                        RowLayout {
+                            width: parent.width
+                            Label { text: "Afinação" }
+                            SegmentedControl {
+                                model: [{ value: "0", label: "Padrão" }, { value: "1", label: "½ tom abaixo" }, { value: "2", label: "1 tom abaixo" }]
+                                current: String(page.tuning)
+                                onActivated: (v) => page.tuning = Number(v)
+                            }
+                        }
+                        RowLayout {
+                            width: parent.width
+                            Label { text: "Tablaturas" }
+                            SegmentedControl {
+                                model: [{ value: "1", label: "Mostrar" }, { value: "0", label: "Esconder" }]
+                                current: prefs.showTabs ? "1" : "0"
+                                onActivated: (v) => prefs.showTabs = (v === "1")
+                            }
+                        }
+                        RowLayout {
+                            width: parent.width
+                            Label { text: "Batidas" }
+                            SegmentedControl {
+                                model: [{ value: "1", label: "Mostrar" }, { value: "0", label: "Esconder" }]
+                                current: prefs.showStrums ? "1" : "0"
+                                onActivated: (v) => prefs.showStrums = (v === "1")
+                            }
+                        }
+                        RowLayout {
+                            width: parent.width
+                            Label { text: "Metrônomo (" + page.songBpm + " BPM" + (page.song && (page.song.bpm || page.songBpm !== 80) ? ", da música)" : ", padrão)") }
+                            AppButton { text: page.metroVisible ? "Esconder" : "Mostrar"; onClicked: page.metroVisible = !page.metroVisible }
+                        }
+                        RowLayout {
+                            width: parent.width
+                            Label { text: "Pedal passador (Page Down / Page Up ou setas)" }
+                            SegmentedControl {
+                                model: [{ value: "1", label: "Ligado" }, { value: "0", label: "Desligado" }]
+                                current: prefs.pedal ? "1" : "0"
+                                onActivated: (v) => prefs.pedal = (v === "1")
+                            }
+                        }
+                        Hint {
+                            width: parent.width
+                            wrapMode: Text.WordWrap
+                            text: "Afinador e Tocar junto usam o microfone e chegam no próximo passo."
+                        }
+                        AppButton {
+                            text: "Restaurar padrões"
+                            onClicked: page.restoreDefaults()
+                        }
+                    }
+                }
+
                 // ---- Batidas (fechadas: só as setas) ----
                 Collapsible {
                     id: strumsGroup
-                    visible: page.usedStrums.length > 0
+                    visible: page.usedStrums.length > 0 && prefs.showStrums
                     width: parent.width
                     title: page.usedStrums.length > 1 ? "Batidas" : "Batida"
                     expanded: false
@@ -301,7 +506,7 @@ Rectangle {
                                                                              (index + 1) * fullScoreCard.perRow)
                                     pattern: ["D"]
                                     slots: fullScoreCard.perRow
-                                    semitones: page.semitones
+                                    semitones: page.shift
                                     zoom: page.zoom
                                 }
                             }
@@ -334,140 +539,147 @@ Rectangle {
                     AppButton { text: "Abrir todas"; flat: true; onClicked: page.setAll(true) }
                     AppButton { text: "Fechar todas"; flat: true; onClicked: page.setAll(false) }
                 }
-                Repeater {
-                    model: page.song && !page.showFullScore ? page.song.sections : []
-                    Collapsible {
-                        id: section
-                        required property var modelData
-                        required property int index
-                        readonly property var strum: Examples.strumOf(page.song, modelData)
-                        readonly property string sameAs: page.sameAs(index)
-                        width: content.width
-                        title: modelData.name
-                        badge: modelData.repeat > 1 ? modelData.repeat + "×" : ""
-                        summary: (sameAs ? "igual a " + sameAs + " · " : "") + page.chordList(modelData)
-                        expanded: sameAs === ""
-                        Connections {
-                            target: page
-                            function onSetAll(open) { section.expanded = open }
-                        }
+                Grid {
+                    id: secGrid
+                    width: content.width
+                    columns: Math.max(1, Math.min(prefs.columns, Math.floor(content.width / 330)))
+                    columnSpacing: 16
+                    rowSpacing: 14
+                    Repeater {
+                        model: page.song && !page.showFullScore ? page.song.sections : []
+                        Collapsible {
+                            id: section
+                            required property var modelData
+                            required property int index
+                            readonly property var strum: Examples.strumOf(page.song, modelData)
+                            readonly property string sameAs: page.sameAs(index)
+                            width: (secGrid.width - (secGrid.columns - 1) * secGrid.columnSpacing) / secGrid.columns
+                            title: modelData.name
+                            badge: modelData.repeat > 1 ? modelData.repeat + "×" : ""
+                            summary: (sameAs ? "igual a " + sameAs + " · " : "") + page.chordList(modelData)
+                            expanded: sameAs === ""
+                            Connections {
+                                target: page
+                                function onSetAll(open) { section.expanded = open }
+                            }
 
-                        Card {
-                            width: parent.width
-                            TabText {
-                                visible: !!section.modelData.tab && page.viewMode !== "tab" && page.viewMode !== "score"
+                            Card {
                                 width: parent.width
-                                tab: section.modelData.tab || ""
-                                zoom: page.zoom
-                            }
-                            TabScore {
-                                visible: !!section.modelData.tab && (page.viewMode === "tab" || page.viewMode === "score")
-                                width: parent.width
-                                height: implicitHeight
-                                tab: visible ? section.modelData.tab : ""
-                                keyName: page.song ? page.t(page.song.key) : "C"
-                                zoom: page.zoom
-                            }
-                            Flow {
-                                visible: section.modelData.chords.length > 0
-                                width: parent.width
-                                spacing: 8
-                                Repeater {
-                                    model: section.modelData.chords
-                                    Rectangle {
-                                        id: chordBox
-                                        required property string modelData
-                                        readonly property string chordName: Examples.chordName(modelData)
-                                        readonly property var voicing: Examples.voicing(page.song, modelData)
-                                        readonly property real zm: page.zoom
-                                        readonly property bool diag: page.viewMode === "diagram" && diagram.visible
-                                        readonly property bool tab: page.viewMode === "tab" && strumTab.visible
-                                        readonly property bool big: page.viewMode === "big" && bigDiagram.visible
-                                        readonly property bool score: page.viewMode === "score" && notation.visible
-                                        readonly property real contentW: diag ? diagram.implicitWidth * zm : tab ? strumTab.implicitWidth * zm
-                                                                       : big ? bigDiagram.implicitWidth * zm
-                                                                       : score ? notation.implicitWidth : 0
-                                        readonly property real contentH: diag ? diagram.implicitHeight * zm : tab ? strumTab.implicitHeight * zm
-                                                                       : big ? bigDiagram.implicitHeight * zm
-                                                                       : score ? notation.implicitHeight : 0
-                                        width: Math.max(64 * zm, contentW + 16, chordText.implicitWidth + 24)
-                                        height: contentH > 0 ? chordText.implicitHeight + contentH + 24 : chordText.implicitHeight + 20
-                                        radius: Theme.radiusSmall
-                                        color: Qt.rgba(Theme.chord.r, Theme.chord.g, Theme.chord.b, Theme.dark ? 0.16 : 0.09)
-                                        Text {
-                                            id: chordText
-                                            anchors.horizontalCenter: parent.horizontalCenter
-                                            y: chordBox.contentH > 0 ? 8 : (parent.height - height) / 2
-                                            text: page.t(chordBox.chordName)
-                                            color: Theme.chord
-                                            font.family: Theme.monoFamily
-                                            font.pixelSize: (Theme.fontSize + 4) * chordBox.zm
-                                            font.weight: Font.Bold
-                                        }
-                                        ChordDiagram {
-                                            id: diagram
-                                            scale: chordBox.zm
-                                            transformOrigin: Item.Top
-                                            visible: page.viewMode === "diagram" && shape !== null
-                                            chord: chordBox.chordName
-                                            voicing: chordBox.voicing
-                                            semitones: page.semitones
-                                            anchors.horizontalCenter: parent.horizontalCenter
-                                            anchors.horizontalCenterOffset: -4
-                                            anchors.top: chordText.bottom
-                                            anchors.topMargin: 6
-                                        }
-                                        BigChordDiagram {
-                                            id: bigDiagram
-                                            scale: chordBox.zm
-                                            transformOrigin: Item.Top
-                                            visible: page.viewMode === "big" && shape !== null
-                                            chord: chordBox.chordName
-                                            voicing: chordBox.voicing
-                                            semitones: page.semitones
-                                            anchors.horizontalCenter: parent.horizontalCenter
-                                            anchors.horizontalCenterOffset: -8
-                                            anchors.top: chordText.bottom
-                                            anchors.topMargin: 8
-                                        }
-                                        NotationView {
-                                            id: notation
-                                            zoom: chordBox.zm
-                                            visible: page.viewMode === "score" && shape !== null
-                                            width: implicitWidth
-                                            height: implicitHeight
-                                            chord: chordBox.chordName
-                                            voicing: chordBox.voicing
-                                            semitones: page.semitones
-                                            pattern: section.strum ? section.strum.pattern : ["D"]
-                                            anchors.horizontalCenter: parent.horizontalCenter
-                                            anchors.top: chordText.bottom
-                                            anchors.topMargin: 4
-                                        }
-                                        StrumTab {
-                                            id: strumTab
-                                            scale: chordBox.zm
-                                            transformOrigin: Item.Top
-                                            visible: page.viewMode === "tab" && shape !== null
-                                            chord: chordBox.chordName
-                                            voicing: chordBox.voicing
-                                            semitones: page.semitones
-                                            pattern: section.strum ? section.strum.pattern : ["D"]
-                                            counts: section.strum ? section.strum.counts : []
-                                            anchors.horizontalCenter: parent.horizontalCenter
-                                            anchors.top: chordText.bottom
-                                            anchors.topMargin: 6
+                                TabText {
+                                    visible: prefs.showTabs && !!section.modelData.tab && page.viewMode !== "tab" && page.viewMode !== "score"
+                                    width: parent.width
+                                    tab: section.modelData.tab || ""
+                                    zoom: page.zoom
+                                }
+                                TabScore {
+                                    visible: prefs.showTabs && !!section.modelData.tab && (page.viewMode === "tab" || page.viewMode === "score")
+                                    width: parent.width
+                                    height: implicitHeight
+                                    tab: visible ? section.modelData.tab : ""
+                                    keyName: page.song ? page.t(page.song.key) : "C"
+                                    zoom: page.zoom
+                                }
+                                Flow {
+                                    visible: section.modelData.chords.length > 0
+                                    width: parent.width
+                                    spacing: 8
+                                    Repeater {
+                                        model: section.modelData.chords
+                                        Rectangle {
+                                            id: chordBox
+                                            required property string modelData
+                                            readonly property string chordName: Examples.chordName(modelData)
+                                            readonly property var voicing: Examples.voicing(page.song, modelData)
+                                            readonly property real zm: page.zoom
+                                            readonly property bool diag: page.viewMode === "diagram" && diagram.visible
+                                            readonly property bool tab: page.viewMode === "tab" && strumTab.visible
+                                            readonly property bool big: page.viewMode === "big" && bigDiagram.visible
+                                            readonly property bool score: page.viewMode === "score" && notation.visible
+                                            readonly property real contentW: diag ? diagram.implicitWidth * zm : tab ? strumTab.implicitWidth * zm
+                                                                           : big ? bigDiagram.implicitWidth * zm
+                                                                           : score ? notation.implicitWidth : 0
+                                            readonly property real contentH: diag ? diagram.implicitHeight * zm : tab ? strumTab.implicitHeight * zm
+                                                                           : big ? bigDiagram.implicitHeight * zm
+                                                                           : score ? notation.implicitHeight : 0
+                                            width: Math.max(64 * zm, contentW + 16, chordText.implicitWidth + 24)
+                                            height: contentH > 0 ? chordText.implicitHeight + contentH + 24 : chordText.implicitHeight + 20
+                                            radius: Theme.radiusSmall
+                                            color: Qt.rgba(Theme.chord.r, Theme.chord.g, Theme.chord.b, Theme.dark ? 0.16 : 0.09)
+                                            Text {
+                                                id: chordText
+                                                anchors.horizontalCenter: parent.horizontalCenter
+                                                y: chordBox.contentH > 0 ? 8 : (parent.height - height) / 2
+                                                text: page.t(chordBox.chordName)
+                                                color: Theme.chord
+                                                font.family: Theme.monoFamily
+                                                font.pixelSize: (Theme.fontSize + 4) * chordBox.zm
+                                                font.weight: Font.Bold
+                                            }
+                                            ChordDiagram {
+                                                id: diagram
+                                                scale: chordBox.zm
+                                                transformOrigin: Item.Top
+                                                visible: page.viewMode === "diagram" && shape !== null
+                                                chord: chordBox.chordName
+                                                voicing: chordBox.voicing
+                                                semitones: page.shift
+                                                anchors.horizontalCenter: parent.horizontalCenter
+                                                anchors.horizontalCenterOffset: -4
+                                                anchors.top: chordText.bottom
+                                                anchors.topMargin: 6
+                                            }
+                                            BigChordDiagram {
+                                                id: bigDiagram
+                                                scale: chordBox.zm
+                                                transformOrigin: Item.Top
+                                                visible: page.viewMode === "big" && shape !== null
+                                                chord: chordBox.chordName
+                                                voicing: chordBox.voicing
+                                                semitones: page.shift
+                                                anchors.horizontalCenter: parent.horizontalCenter
+                                                anchors.horizontalCenterOffset: -8
+                                                anchors.top: chordText.bottom
+                                                anchors.topMargin: 8
+                                            }
+                                            NotationView {
+                                                id: notation
+                                                zoom: chordBox.zm
+                                                visible: page.viewMode === "score" && shape !== null
+                                                width: implicitWidth
+                                                height: implicitHeight
+                                                chord: chordBox.chordName
+                                                voicing: chordBox.voicing
+                                                semitones: page.shift
+                                                pattern: section.strum ? section.strum.pattern : ["D"]
+                                                anchors.horizontalCenter: parent.horizontalCenter
+                                                anchors.top: chordText.bottom
+                                                anchors.topMargin: 4
+                                            }
+                                            StrumTab {
+                                                id: strumTab
+                                                scale: chordBox.zm
+                                                transformOrigin: Item.Top
+                                                visible: page.viewMode === "tab" && shape !== null
+                                                chord: chordBox.chordName
+                                                voicing: chordBox.voicing
+                                                semitones: page.shift
+                                                pattern: section.strum ? section.strum.pattern : ["D"]
+                                                counts: section.strum ? section.strum.counts : []
+                                                anchors.horizontalCenter: parent.horizontalCenter
+                                                anchors.top: chordText.bottom
+                                                anchors.topMargin: 6
+                                            }
                                         }
                                     }
                                 }
-                            }
-                            Text {
-                                visible: !!section.modelData.note
-                                text: section.modelData.note || ""
-                                color: Theme.textDim
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize - 1
-                                font.italic: true
+                                Text {
+                                    visible: !!section.modelData.note
+                                    text: section.modelData.note || ""
+                                    color: Theme.textDim
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSize - 1
+                                    font.italic: true
+                                }
                             }
                         }
                     }
@@ -483,6 +695,53 @@ Rectangle {
                     font.pixelSize: Theme.fontSize - 2
                     horizontalAlignment: Text.AlignHCenter
                 }
+            }
+        }
+    }
+
+    // Metrônomo flutuante, no canto, sem tapar a cifra.
+    Rectangle {
+        visible: page.metroVisible
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.margins: 16
+        width: metroRow.implicitWidth + 24
+        height: metroRow.implicitHeight + 20
+        radius: Theme.radius
+        color: Theme.card
+        border.width: 1
+        border.color: Theme.border
+        RowLayout {
+            id: metroRow
+            anchors.centerIn: parent
+            spacing: 8
+            Row {
+                spacing: 5
+                Repeater {
+                    model: 4
+                    Rectangle {
+                        required property int index
+                        width: 12; height: 12; radius: 6
+                        color: metro.running && ((metro.beat % 4) + 4) % 4 === index
+                               ? (index === 0 ? Theme.chord : Theme.accent) : Theme.button
+                    }
+                }
+            }
+            AppButton { iconName: "remove"; onClicked: { metro.bpm = Math.max(30, metro.bpm - 2); metro.t0 = Date.now(); metro.beat = -1 } }
+            Text {
+                text: metro.bpm + " BPM"
+                color: Theme.text
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSize + 1
+                font.weight: Font.Bold
+            }
+            AppButton { iconName: "add"; onClicked: { metro.bpm = Math.min(240, metro.bpm + 2); metro.t0 = Date.now(); metro.beat = -1 } }
+            AppButton { text: metro.running ? "Parar" : "Tocar"; suggested: !metro.running; onClicked: page.toggleMetro() }
+            AppButton {
+                visible: metro.bpm !== page.songBpm
+                text: "BPM da música"
+                flat: true
+                onClicked: { metro.bpm = page.songBpm; metro.t0 = Date.now(); metro.beat = -1 }
             }
         }
     }

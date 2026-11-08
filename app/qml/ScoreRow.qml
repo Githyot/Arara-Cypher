@@ -18,7 +18,19 @@ Canvas {
     readonly property real gap: 9
     readonly property real tabGap: 11
     readonly property real clefW: 48
-    readonly property real topPad: 46
+    // Espaço em cima: cabe a nota mais aguda dos acordes da linha com a haste.
+    readonly property int maxStep: {
+        var open = [40, 45, 50, 55, 59, 64], top = 38
+        for (var i = 0; i < measures.length; ++i) {
+            var sh = Examples.shape(measures[i].chord, semitones, measures[i].voicing || null)
+            if (!sh) continue
+            for (var k = 0; k < 6; ++k)
+                if (sh.frets[k] >= 0)
+                    top = Math.max(top, Examples.spell(open[k] + sh.frets[k], measures[i].chord).step)
+        }
+        return top
+    }
+    readonly property real topPad: Math.max(46, (maxStep - 38) * gap / 2 + gap * 3.5 + 26)
     readonly property real staffTop: topPad
     readonly property real staffBottom: staffTop + gap * 4
     readonly property real tabTop: staffBottom + gap * 6

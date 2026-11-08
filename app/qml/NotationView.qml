@@ -17,7 +17,13 @@ Canvas {
     readonly property real gap: 9          // distância entre linhas da pauta
     readonly property real slotW: 28
     readonly property real clefW: 40
-    readonly property real staffTop: gap * 6
+    readonly property real staffTop: {
+        var top = 38
+        for (var i = 0; i < events.length; ++i)
+            for (var k = 0; k < events[i].length; ++k)
+                top = Math.max(top, Examples.spell(events[i][k].midi, chord).step)
+        return Math.max(gap * 6, (top - 38) * gap / 2 + gap * 3.5 + 10)
+    }
     readonly property real staffBottom: staffTop + gap * 4
 
     property var voicing: null        // forma tirada da aula (opcional)

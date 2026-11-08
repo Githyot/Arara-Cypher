@@ -14,7 +14,28 @@ Canvas {
     property int startNumber: 0        // número do compasso (0 = não mostra)
     property string label: ""          // nome da parte, em cima da primeira linha
 
-    readonly property var events: tab.length > 0 ? JSON.parse(Music.parseTab(tab)) : []
+    // Eventos em ordem (notas e barras), com a seta da batida de cada nota
+    // quando a tab traz a linha de setas embaixo.
+    readonly property var events: {
+        if (tab.length === 0) return []
+        var systems = JSON.parse(Music.lessonTab(tab))
+        var out = []
+        for (var s = 0; s < systems.length; ++s) {
+            var sys = systems[s]
+            if (s > 0) out.push({ bar: true })
+            var bi = 0
+            for (var e = 0; e < sys.events.length; ++e) {
+                while (bi < sys.bars.length && sys.bars[bi] < sys.events[e].col) {
+                    if (out.length && !out[out.length - 1].bar) out.push({ bar: true })
+                    bi++
+                }
+                out.push({ notes: sys.events[e].notes, arrow: sys.events[e].arrow || "" })
+            }
+        }
+        while (out.length && out[out.length - 1].bar) out.pop()
+        return out
+    }
+    readonly property bool hasArrows: events.some(function (e) { return !!e.arrow })
     readonly property real lw: width / zoom
 
     readonly property real gap: 9
@@ -22,9 +43,23 @@ Canvas {
     readonly property real clefW: 48
     readonly property real slotW: 24
     readonly property real barW: 12
-    readonly property real topPad: label.length > 0 ? 30 : 18
+    // Nota mais aguda da tab (passo diatônico), para dar espaço às notas e
+    // hastes que passam por cima da pauta.
+    readonly property int maxStep: {
+        var open = [40, 45, 50, 55, 59, 64], top = 38
+        for (var i = 0; i < events.length; ++i) {
+            var ns = events[i].notes || []
+            for (var k = 0; k < ns.length; ++k)
+                top = Math.max(top, Examples.spell(open[ns[k].string] + ns[k].fret, keyName).step)
+        }
+        return top
+    }
+    // Espaço em cima: a nota mais alta acima da linha de cima, a haste
+    // (3,5 espaços) e a barra da colcheia.
+    readonly property real headroom: Math.max(18, (maxStep - 38) * gap / 2 + gap * 3.5 + 8)
+    readonly property real topPad: (label.length > 0 ? 14 : 0) + headroom
     readonly property real staffH: gap * 4
-    readonly property real rowH: topPad + staffH + gap * 6 + tabGap * 5 + 22
+    readonly property real rowH: topPad + staffH + gap * 6 + tabGap * 5 + 22 + (hasArrows ? 20 : 0)
 
     // Divide os eventos em linhas que cabem na largura.
     readonly property var rows: {
@@ -175,6 +210,14 @@ Canvas {
                         ctx.fillText(tl, cx - slotW / 2 - 2, tyy - 6)
                         ctx.font = "bold 11px sans-serif"
                     }
+                }
+                // Direção da palhetada embaixo da tab.
+                if (ev.arrow) {
+                    ctx.fillStyle = accent
+                    ctx.font = "bold 15px sans-serif"
+                    var ar = ev.arrow === "U" ? "↑" : "↓"
+                    ctx.fillText(ar, cx - ctx.measureText(ar).width / 2, tabBottom + 22)
+                    ctx.font = "bold 11px sans-serif"
                 }
                 // Pauta.
                 var minY = 1e9, maxY = -1e9, prevStep = -100

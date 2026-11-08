@@ -10,6 +10,7 @@ fn main() {
         "qml/SettingsPage.qml",
         "qml/SongPage.qml",
         "qml/StrumTab.qml",
+        "qml/StrumStrip.qml",
         "qml/TabScore.qml",
         "qml/LessonTab.qml",
         "qml/TabText.qml",

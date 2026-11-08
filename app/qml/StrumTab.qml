@@ -21,6 +21,7 @@ Item {
     property var pattern: []
     property var counts: []
     property bool showStringNames: true
+    property bool dashes: true        // traços das cordas (a tab comprida desenha linhas inteiras)
 
     readonly property real cellW: 22
     readonly property real rowH: 20
@@ -131,7 +132,7 @@ Item {
 
                     // Linha da corda (tracejada, como nas aulas).
                     Rectangle {
-                        visible: cell.value === null
+                        visible: root.dashes && cell.value === null
                         anchors.centerIn: parent
                         width: root.cellW - 8
                         height: 1.5
@@ -147,7 +148,7 @@ Item {
                         width: 19
                         height: 19
                         radius: 9.5
-                        color: "transparent"
+                        color: Theme.card     // esconde a linha da corda atrás do número
                         border.width: finger > 0 ? 1.6 : 0
                         border.color: Theme.fingerColors[finger]
                         Text {

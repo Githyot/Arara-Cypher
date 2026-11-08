@@ -651,8 +651,19 @@ Rectangle {
                                     keyName: page.song ? page.t(page.song.key) : "C"
                                     zoom: page.zoom
                                 }
+                                // Tab: os acordes numa tab só, comprida, como na partitura.
+                                StrumStrip {
+                                    visible: page.chordMode === "tab" && section.modelData.chords.length > 0
+                                    width: parent.width
+                                    chords: visible ? section.modelData.chords : []
+                                    song: page.song
+                                    semitones: page.shift
+                                    pattern: section.strum ? section.strum.pattern : ["D"]
+                                    counts: section.strum ? section.strum.counts : []
+                                    zoom: page.zoom
+                                }
                                 Flow {
-                                    visible: section.modelData.chords.length > 0
+                                    visible: page.chordMode !== "tab" && section.modelData.chords.length > 0
                                     width: parent.width
                                     spacing: 8
                                     Repeater {

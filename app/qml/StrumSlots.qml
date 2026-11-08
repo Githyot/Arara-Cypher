@@ -2,8 +2,9 @@ import QtQuick
 import AraraCypher
 
 // Os tempos de uma batida, um botão por tempo: tocar troca o golpe
-// (pausa, baixo, tudo, acorde, agudas, abafa).
-Flow {
+// (pausa, baixo, tudo, acorde, agudas, abafa). Em cima, quantos tempos a
+// batida tem (qualquer número) e a divisão: colcheia, tercina, semicolcheia.
+Column {
     id: root
     property var strum: null
     property real slotW: 52
@@ -13,6 +14,46 @@ Flow {
     readonly property var codes: ["", "B", "D", "d", "U", "X"]
     readonly property var codeLabel: ({ "": "·", "B": "baixo", "D": "tudo", "d": "acorde", "U": "agudas", "X": "abafa" })
 
+    spacing: 6
+    readonly property int per: rev, !strum ? 2 : strum.per ? strum.per
+                                : strum.counts && strum.counts.indexOf("&") >= 0 ? 4
+                                : strum.counts && strum.counts.indexOf("a") >= 0 ? 3 : 2
+    function resize(n) {
+        n = Math.max(1, Math.min(48, n))
+        while (strum.pattern.length < n) strum.pattern.push("")
+        strum.pattern.length = n
+        strum.counts = Examples.countsFor(n, per)
+        changed()
+    }
+    function setPer(p) {
+        strum.per = p
+        strum.counts = Examples.countsFor(strum.pattern.length, p)
+        changed()
+    }
+
+    Flow {
+        width: parent.width
+        spacing: 6
+        Text {
+            height: Theme.controlHeight
+            verticalAlignment: Text.AlignVCenter
+            text: root.rev, root.strum ? root.strum.pattern.length + " toques" : ""
+            color: Theme.text
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontSize - 1
+        }
+        AppButton { text: "−1"; enabled: !!root.strum && root.strum.pattern.length > 1; onClicked: root.resize(root.strum.pattern.length - 1) }
+        AppButton { text: "+1"; enabled: !!root.strum; onClicked: root.resize(root.strum.pattern.length + 1) }
+        AppButton { text: "+1 compasso"; flat: true; enabled: !!root.strum; onClicked: root.resize(root.strum.pattern.length + root.per * 4) }
+        SegmentedControl {
+            model: [{ value: "2", label: "1 e" }, { value: "3", label: "Tercina" }, { value: "4", label: "1 e & a" }]
+            current: String(root.per)
+            onActivated: (v) => root.setPer(Number(v))
+        }
+    }
+
+    Flow {
+    width: parent.width
     spacing: 4
     Repeater {
         model: root.rev, root.strum ? root.strum.pattern.slice() : []
@@ -30,14 +71,16 @@ Flow {
                 spacing: 1
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: slot.modelData === "" ? "·" : slot.modelData === "U" ? "↑" : slot.modelData === "X" ? "×" : "↓"
+                    text: Examples.strokeArrow(slot.modelData)
                     color: slot.modelData === "" || slot.modelData === "X" ? Theme.textDim : Theme.accent
                     font.pixelSize: 22
                     font.weight: Font.Bold
                 }
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    text: slot.modelData === "" ? " " : root.codeLabel[slot.modelData]
+                    text: slot.modelData === "" ? " " : Examples.strokeLabel(slot.modelData)
+                    width: Math.min(implicitWidth, root.slotW - 4)
+                    elide: Text.ElideRight
                     color: Theme.text
                     font.family: Theme.fontFamily
                     font.pixelSize: 10
@@ -61,4 +104,5 @@ Flow {
             }
         }
     }
+}
 }

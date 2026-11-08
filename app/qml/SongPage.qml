@@ -231,7 +231,7 @@ Rectangle {
     // "D · D U · U D U" -> setas para o resumo das batidas.
     function arrows(pattern) {
         return pattern.map(function (p) {
-            return p === "" ? "·" : p === "U" ? "↑" : p === "X" ? "×" : "↓"
+            return Examples.strokeArrow(p)
         }).join(" ")
     }
     function chordList(sec) {
@@ -532,7 +532,7 @@ Rectangle {
                                             Text {
                                                 width: parent.width
                                                 horizontalAlignment: Text.AlignHCenter
-                                                text: beat.modelData === "" ? "·" : beat.modelData === "U" ? "↑" : "↓"
+                                                text: Examples.strokeArrow(beat.modelData)
                                                 color: beat.modelData === "" ? Theme.textDim
                                                      : beat.modelData === "X" ? Theme.textDim : Theme.accent
                                                 font.pixelSize: 26

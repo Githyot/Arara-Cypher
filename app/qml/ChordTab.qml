@@ -17,7 +17,7 @@ Column {
     property string status: ""
     signal edited()
 
-    property var sel: null              // { index, token, string }
+    property var sel: null              // { index, token, string, step }
     property int localRev: 0
     onEditingChanged: sel = null
     readonly property int allRev: rev + localRev
@@ -48,8 +48,43 @@ Column {
     }
     function cycleStroke(step) {
         if (!strum) return
-        var i = strokeCodes.indexOf(strum.pattern[step])
-        strum.pattern[step] = strokeCodes[(i + 1) % strokeCodes.length]
+        var code = strum.pattern[step]
+        if (Examples.isPick(code)) {
+            // Dedilhado: a seta só vira (para baixo / para cima).
+            strum.pattern[step] = Examples.pickCode(Examples.pickStrings(code), !Examples.strokeUp(code))
+        } else {
+            var i = strokeCodes.indexOf(code)
+            strum.pattern[step] = strokeCodes[(i + 1) % strokeCodes.length]
+        }
+        changed()
+    }
+    function baseShape(token) {
+        return Examples.shape(Examples.chordName(token), 0, Examples.voicing(song, token))
+    }
+    // Tocar numa casa da tab: se tem número, escolhe; se está vazia, põe a
+    // corda naquele tempo (vira dedilhado: só as cordas escolhidas tocam).
+    function tapCell(index, token, string, step) {
+        sel = { index: index, token: token, string: string, step: step }
+        if (!strum) return
+        var sh = baseShape(token)
+        var code = strum.pattern[step]
+        var strings = Examples.strokeStrings(sh, code)
+        if (strings.indexOf(string) >= 0) return
+        if (sh && sh.frets[string] < 0) {
+            var v = editShape(token)
+            if (v) { v.frets[string] = 0; v.fingers[string] = 0 }
+        }
+        strings.push(string)
+        strum.pattern[step] = Examples.pickCode(strings, Examples.strokeUp(code))
+        changed()
+    }
+    function removeFromStep() {
+        if (!strum || !sel) return
+        var sh = baseShape(sel.token)
+        var code = strum.pattern[sel.step]
+        var strings = Examples.strokeStrings(sh, code).filter(function (s) { return s !== sel.string })
+        strum.pattern[sel.step] = Examples.pickCode(strings, Examples.strokeUp(code))
+        sel = null
         changed()
     }
 
@@ -68,7 +103,7 @@ Column {
             visible: !notePanel.on
             width: parent.width
             wrapMode: Text.WordWrap
-            text: "Toque num número para mudar a casa e o dedo. Toque numa seta para trocar o golpe (baixo, tudo, acorde, agudas, abafa, pausa)."
+            text: "Toque num lugar vazio (+) para pôr um número naquele tempo: assim se monta o dedilhado. Toque num número para mudar a casa, o dedo ou tirar. Toque numa seta para trocar o golpe."
                   + (root.status ? " " + root.status : "")
             color: Theme.textDim
             font.family: Theme.fontFamily
@@ -135,7 +170,12 @@ Column {
                 }
             }
             AppButton {
-                text: notePanel.fret < 0 ? "Tocar a corda" : "Não tocar"
+                text: "Tirar deste tempo"
+                onClicked: root.removeFromStep()
+            }
+            AppButton {
+                flat: true
+                text: notePanel.fret < 0 ? "Tocar a corda" : "Não tocar no acorde"
                 onClicked: root.setFret(notePanel.fret < 0 ? 0 : -1)
             }
             AppButton { text: "Pronto"; flat: true; onClicked: root.sel = null }
@@ -172,7 +212,8 @@ Column {
             editing: root.editing
             selIndex: root.sel ? root.sel.index : -1
             selString: root.sel ? root.sel.string : -1
-            onNoteClicked: (i, token, string) => root.sel = { index: i, token: token, string: string }
+            selStep: root.sel ? root.sel.step : -1
+            onNoteClicked: (i, token, string, step) => root.tapCell(i, token, string, step)
             onStepClicked: (step) => root.cycleStroke(step)
         }
     }

@@ -24,7 +24,8 @@ Item {
     property bool dashes: true        // traços das cordas (a tab comprida desenha linhas inteiras)
     property bool editing: false      // tocar numa casa ou numa seta para mudar
     property int selString: -1        // corda escolhida para editar (realçada)
-    signal noteClicked(int string)
+    property int selStep: -1          // tempo escolhido
+    signal noteClicked(int string, int step)
     signal stepClicked(int step)
 
     readonly property real cellW: 22
@@ -40,18 +41,10 @@ Item {
     readonly property var columns: {
         var cols = []
         if (!shape) return cols
-        var played = []
-        for (var s = 0; s < 6; ++s)
-            if (shape.frets[s] >= 0) played.push(s)
-        var upper = played.filter(function (s) { return s > shape.root })
-        var top3 = played.slice(-3)
         for (var i = 0; i < pattern.length; ++i) {
             var c = [null, null, null, null, null, null]
             var code = pattern[i]
-            var strings = code === "B" ? [shape.root]
-                        : code === "D" ? played
-                        : code === "d" || code === "X" ? upper
-                        : code === "U" ? top3 : []
+            var strings = Examples.strokeStrings(shape, code)
             for (var k = 0; k < strings.length; ++k)
                 c[strings[k]] = code === "X" ? "x" : shape.frets[strings[k]]
             cols.push(c)
@@ -75,7 +68,7 @@ Item {
             height: root.rowH
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
-            text: code === "" ? (root.editing ? "·" : "") : code === "U" ? "↑" : code === "X" && root.editing ? "×" : "↓"
+            text: code === "" ? (root.editing ? "·" : "") : code === "X" && !root.editing ? "↓" : Examples.strokeArrow(code)
             color: code === "X" || code === "" ? Theme.textDim : Theme.chord
             font.pixelSize: 17
             font.bold: true
@@ -153,11 +146,13 @@ Item {
 
                     // Realce da corda escolhida e área de toque no modo de edição.
                     Rectangle {
-                        visible: root.editing && (root.selString === stringRow.string || cellMouse.containsMouse)
+                        readonly property bool chosen: root.selString === stringRow.string && root.selStep === cell.index
+                        visible: root.editing && (chosen || cellMouse.containsMouse)
                         anchors.fill: parent
                         radius: 4
-                        color: Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b,
-                                       root.selString === stringRow.string ? 0.22 : 0.12)
+                        color: Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, chosen ? 0.3 : 0.12)
+                        border.width: chosen ? 1.5 : 0
+                        border.color: Theme.accent
                     }
                     MouseArea {
                         id: cellMouse
@@ -165,7 +160,15 @@ Item {
                         enabled: root.editing
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: root.noteClicked(stringRow.string)
+                        onClicked: root.noteClicked(stringRow.string, cell.index)
+                    }
+                    Text {
+                        visible: root.editing && cell.value === null && cellMouse.containsMouse
+                        anchors.centerIn: parent
+                        text: "+"
+                        color: Theme.accent
+                        font.pixelSize: 14
+                        font.bold: true
                     }
                     // Linha da corda (tracejada, como nas aulas).
                     Rectangle {

@@ -16,7 +16,8 @@ Column {
     property bool editing: false
     property int selIndex: -1          // compasso (acorde) escolhido para editar
     property int selString: -1
-    signal noteClicked(int index, string token, int string)
+    property int selStep: -1
+    signal noteClicked(int index, string token, int string, int step)
     signal stepClicked(int step)
 
     readonly property real cellW: 22
@@ -115,7 +116,8 @@ Column {
                         counts: root.counts
                         editing: root.editing
                         selString: root.selIndex === measure.chordIndex ? root.selString : -1
-                        onNoteClicked: (string) => root.noteClicked(measure.chordIndex, measure.modelData, string)
+                        selStep: root.selStep
+                        onNoteClicked: (string, step) => root.noteClicked(measure.chordIndex, measure.modelData, string, step)
                         onStepClicked: (step) => root.stepClicked(step)
                     }
                     // Barra de compasso.

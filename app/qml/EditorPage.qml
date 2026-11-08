@@ -469,7 +469,7 @@ Rectangle {
                     title: "Batidas"
                     id: strumFold
                     expanded: false
-                    summary: page.rev, page.draft ? page.draft.strums.map(function (s) { return s.pattern.map(function (p) { return p === "" ? "·" : p === "U" ? "↑" : p === "X" ? "×" : "↓" }).join(" ") }).join("   |   ") : ""
+                    summary: page.rev, page.draft ? page.draft.strums.map(function (s) { return s.pattern.map(function (p) { return Examples.strokeArrow(p) }).join(" ") }).join("   |   ") : ""
                     Repeater {
                         model: page.rev, page.draft ? page.draft.strums : []
                         Card {
@@ -490,21 +490,6 @@ Rectangle {
                                     text: strumCard.modelData.name
                                     placeholderText: "Nome da batida"
                                     onTextEdited: strumCard.modelData.name = text
-                                }
-                                AppButton {
-                                    text: "−4"
-                                    visible: strumCard.modelData.pattern.length > 4
-                                    onClicked: { strumCard.modelData.pattern.splice(-4, 4); strumCard.modelData.counts.splice(-4, 4); page.bump() }
-                                }
-                                AppButton {
-                                    text: "+4"
-                                    visible: strumCard.modelData.pattern.length < 16
-                                    onClicked: {
-                                        var n = strumCard.modelData.pattern.length / 2
-                                        strumCard.modelData.pattern.push("", "", "", "")
-                                        strumCard.modelData.counts.push(String(n + 1), "e", String(n + 2), "e")
-                                        page.bump()
-                                    }
                                 }
                                 AppButton {
                                     visible: page.draft.strums.length > 1

@@ -67,10 +67,7 @@ Canvas {
             var code = pattern[i]
             out.push({
                 code: code,
-                strings: code === "B" ? [shape.root]
-                       : code === "D" ? played
-                       : code === "d" || code === "X" ? upper
-                       : code === "U" ? top3 : []
+                strings: Examples.strokeStrings(shape, code)
             })
         }
         return out

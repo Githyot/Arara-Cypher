@@ -15,6 +15,53 @@ import AraraCypher
 //             apelido depois de "@" (ex.: "Gm7@2"); o "@..." não aparece na tela.
 //             Acorde sem forma aqui usa a forma calculada pelo app.
 QtObject {
+    // ---- Golpes da batida ----
+    // "B" baixo, "D" tudo, "d" acorde sem o baixo, "U" agudas para cima,
+    // "X" abafado, "" pausa e, para dedilhado, "P" + cordas ("P03" = cordas 0
+    // e 3 para baixo, "P5U" = corda 5 para cima). Corda 0 = Mi grave.
+    function isPick(code) { return code && code.charAt(0) === "P" }
+    function strokeUp(code) {
+        return code === "U" || (isPick(code) && code.charAt(code.length - 1) === "U")
+    }
+    function strokeArrow(code) {
+        return code === "" ? "·" : code === "X" ? "×" : strokeUp(code) ? "↑" : "↓"
+    }
+    function strokeLabel(code) {
+        if (isPick(code)) return "corda " + pickStrings(code).map(function (s) { return ["E", "A", "D", "G", "B", "e"][s] }).join("+")
+        return ({ "": "·", "B": "baixo", "D": "tudo", "d": "acorde", "U": "agudas", "X": "abafa" })[code] || code
+    }
+    function pickStrings(code) {
+        var out = []
+        for (var i = 1; i < code.length; ++i) {
+            var n = code.charCodeAt(i) - 48
+            if (n >= 0 && n <= 5) out.push(n)
+        }
+        return out
+    }
+    function pickCode(strings, up) {
+        strings = strings.slice().sort()
+        return strings.length ? "P" + strings.join("") + (up ? "U" : "") : ""
+    }
+    // Cordas que soam num tempo, para uma forma { frets, root }.
+    function strokeStrings(shape, code) {
+        if (!shape) return []
+        if (isPick(code)) return pickStrings(code).filter(function (s) { return shape.frets[s] >= 0 })
+        var played = []
+        for (var s = 0; s < 6; ++s) if (shape.frets[s] >= 0) played.push(s)
+        var upper = played.filter(function (s) { return s > shape.root })
+        return code === "B" ? [shape.root]
+             : code === "D" ? played
+             : code === "d" || code === "X" ? upper
+             : code === "U" ? played.slice(-3) : []
+    }
+    // Contagem de uma batida com n tempos e "per" tempos por batida do compasso.
+    function countsFor(n, per) {
+        var marks = per === 3 ? ["e", "a"] : per === 4 ? ["e", "&", "a"] : ["e"]
+        var out = []
+        for (var i = 0; i < n; ++i) out.push(i % per === 0 ? String(Math.floor(i / per) % 4 + 1) : marks[i % per - 1])
+        return out
+    }
+
     // Nome que aparece na tela (sem o apelido "@...").
     function chordName(token) {
         var at = token.indexOf("@")

@@ -41,10 +41,7 @@ Canvas {
         var top3 = played.slice(-3)
         for (var i = 0; i < pattern.length; ++i) {
             var code = pattern[i]
-            var strings = code === "B" ? [shape.root]
-                        : code === "D" ? played
-                        : code === "d" || code === "X" ? upper
-                        : code === "U" ? top3 : []
+            var strings = Examples.strokeStrings(shape, code)
             var notes = []
             for (var k = 0; k < strings.length; ++k)
                 notes.push({ midi: open[strings[k]] + shape.frets[strings[k]], muted: code === "X" })

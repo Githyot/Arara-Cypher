@@ -821,7 +821,7 @@ Rectangle {
                                     anchors.centerIn: parent
                                     Text {
                                         anchors.horizontalCenter: parent.horizontalCenter
-                                        text: modelData === "" ? "·" : modelData === "U" ? "↑" : modelData === "X" ? "×" : "↓"
+                                        text: Examples.strokeArrow(modelData)
                                         color: modelData === "" ? Theme.textDim : Theme.accent
                                         font.pixelSize: 30
                                         font.weight: Font.Bold

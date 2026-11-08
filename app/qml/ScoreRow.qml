@@ -173,7 +173,7 @@ Canvas {
             for (var i = 0; i < events.length; ++i) {
                 var ev = events[i]
                 var cx = x0 + 10 + slotW * (i + 0.5)
-                var muted = ev.code === "X"
+                var muted = Examples.isMute(ev.code)
 
                 // Tab: casa em cada corda tocada.
                 ctx.font = "bold 11px sans-serif"

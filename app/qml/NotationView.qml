@@ -44,7 +44,7 @@ Canvas {
             var strings = Examples.strokeStrings(shape, code)
             var notes = []
             for (var k = 0; k < strings.length; ++k)
-                notes.push({ midi: open[strings[k]] + shape.frets[strings[k]], muted: code === "X" })
+                notes.push({ midi: open[strings[k]] + shape.frets[strings[k]], muted: Examples.isMute(code) })
             out.push(notes)
         }
         return out

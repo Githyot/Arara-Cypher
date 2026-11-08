@@ -105,7 +105,7 @@ Rectangle {
         return out
     }
     readonly property var strums: {
-        if (!song || !song.strums) return [{ name: "Batida", pattern: ["D", "", "D", "U", "", "U", "D", "U"],
+        if (!song || !song.strums || !song.strums.length) return [{ name: "Batida", pattern: ["D", "", "D", "U", "", "U", "D", "U"],
                                               counts: ["1", "e", "2", "e", "3", "e", "4", "e"] }]
         return song.strums
     }

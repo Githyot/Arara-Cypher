@@ -10,6 +10,7 @@ Column {
     property var song: null
     property int semitones: 0
     property var pattern: ["D"]
+    property var patterns: []          // tempos de cada compasso (se mudaram só ali)
     property var counts: []
     property real zoom: 1
     property int rev: 0                // muda quando a música é editada aqui
@@ -18,13 +19,15 @@ Column {
     property int selString: -1
     property int selStep: -1
     signal noteClicked(int index, string token, int string, int step)
-    signal stepClicked(int step)
+    signal stepClicked(int index, int step)
 
     readonly property real cellW: 22
     readonly property real rowH: 20
     readonly property real titleH: 26 * zoom
     readonly property real labelW: 30 * zoom
-    readonly property real measureW: (Math.max(1, pattern.length) * cellW + 12) * zoom
+    // Largura do compasso: cabe a batida e o nome do acorde mais comprido.
+    readonly property int nameLen: chords.reduce(function (m, c) { return Math.max(m, Examples.chordName(c).length) }, 0)
+    readonly property real measureW: Math.max(Math.max(1, pattern.length) * cellW + 12, nameLen * 10.5 + 16) * zoom
     readonly property int perRow: Math.max(1, Math.floor((width - labelW - 4) / measureW))
     readonly property real stripH: titleH + (rowH * 8 + 6) * zoom
 
@@ -95,7 +98,7 @@ Column {
                         model: 6
                         Rectangle {
                             required property int index
-                            y: root.titleH + (root.rowH * index + root.rowH / 2) * root.zoom
+                            y: Math.round(root.titleH + (root.rowH * index + root.rowH / 2) * root.zoom)
                             width: measure.width
                             height: 1
                             color: Theme.textDim
@@ -112,14 +115,14 @@ Column {
                         chord: Examples.chordName(measure.modelData)
                         voicing: root.rev, root.song ? Examples.voicing(root.song, measure.modelData) : null
                         semitones: root.semitones
-                        pattern: root.pattern
+                        pattern: root.patterns[measure.chordIndex] || root.pattern
                         counts: root.counts
                         editing: root.editing
                         selString: root.selIndex === measure.chordIndex ? root.selString : -1
                         selStep: root.selStep
                         rev: root.rev
                         onNoteClicked: (string, step) => root.noteClicked(measure.chordIndex, measure.modelData, string, step)
-                        onStepClicked: (step) => root.stepClicked(step)
+                        onStepClicked: (step) => root.stepClicked(measure.chordIndex, step)
                     }
                     // Barra de compasso.
                     Rectangle {

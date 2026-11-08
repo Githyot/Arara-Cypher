@@ -16,6 +16,20 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Casa especial para corda abafada ("x" na tab).
+pub const MUTED: u8 = 255;
+
+impl TabNote {
+    /// Como a nota aparece na tab: técnica + casa, ou "x" se abafada.
+    pub fn label(&self) -> String {
+        if self.fret == MUTED {
+            format!("{}x", self.tech)
+        } else {
+            format!("{}{}", self.tech, self.fret)
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TabNote {
     /// Corda: 0 = Mi grave ... 5 = Mi agudo.
@@ -151,6 +165,11 @@ fn flush(block: &mut Vec<(Option<char>, &str)>, out: &mut Vec<TabEvent>) {
                         bars[c] = true;
                     }
                 }
+                'x' | 'X' => columns[c].push(TabNote {
+                    string,
+                    fret: MUTED,
+                    tech: std::mem::take(&mut tech),
+                }),
                 'h' | 'p' | '/' | '\\' | 'b' | '~' => tech = ch.to_string(),
                 '-' | ' ' => {}
                 _ => {}
@@ -314,11 +333,7 @@ fn rewrite_block(block: &[&str], sys: &System) -> Vec<String> {
             continue;
         }
         // Embaixo do último algarismo da nota mais grave (onde o olho bate).
-        let len = e
-            .notes
-            .first()
-            .map(|n| n.fret.to_string().len())
-            .unwrap_or(1);
+        let len = e.notes.first().map(|n| n.label().len()).unwrap_or(1);
         let at = offset + e.col + len - 1;
         if line.len() <= at {
             line.resize(at + 1, ' ');
@@ -489,7 +504,7 @@ pub fn render(systems: &[EditSystem]) -> String {
                 }
                 pos += 3;
             }
-            let token = |n: &TabNote| format!("{}{}", n.tech, n.fret);
+            let token = |n: &TabNote| n.label();
             let w = ev
                 .notes
                 .iter()
@@ -588,6 +603,11 @@ fn lesson_block(block: &[&str]) -> Option<System> {
             }
             match ch {
                 '|' if c + 1 < chars.len() && c > 0 && !bars.contains(&c) => bars.push(c),
+                'x' | 'X' => columns[c].push(TabNote {
+                    string,
+                    fret: MUTED,
+                    tech: std::mem::take(&mut tech),
+                }),
                 'h' | 'p' | '/' | '\\' | 'b' | '~' => tech = ch.to_string(),
                 _ => {}
             }
@@ -689,7 +709,7 @@ mod tests {
                 TabEvent::Bar { .. } => "|".to_string(),
                 TabEvent::Notes { notes } => notes
                     .iter()
-                    .map(|n| format!("{}:{}{}", n.string, n.tech, n.fret))
+                    .map(|n| format!("{}:{}", n.string, n.label()))
                     .collect::<Vec<_>>()
                     .join("+"),
             })
@@ -759,6 +779,17 @@ E|-----------------------|";
         let text = render(&model);
         let again = edit_model(&text);
         assert_eq!(again, model, "{text}");
+    }
+
+    #[test]
+    fn muted_strings_survive_as_x() {
+        let tab = "e|--x--3--|\nB|--x--3--|\nG|--x--0--|\nD|--x--0--|\nA|--x--2--|\nE|--x--3--|\n    ↓  ↑\n";
+        let model = edit_model(tab);
+        assert_eq!(model[0].events.len(), 2);
+        assert!(model[0].events[0].notes.iter().all(|n| n.fret == MUTED));
+        let text = render(&model);
+        assert!(text.lines().next().unwrap().contains('x'), "{text}");
+        assert_eq!(edit_model(&text), model);
     }
 
     #[test]

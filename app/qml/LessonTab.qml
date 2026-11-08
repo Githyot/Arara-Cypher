@@ -208,7 +208,7 @@ Item {
                                 Text {
                                     id: noteText
                                     anchors.centerIn: parent
-                                    text: (modelData.tech || "") + modelData.fret
+                                    text: (modelData.tech || "") + (modelData.fret === 255 ? "x" : modelData.fret)
                                     color: ev.active ? Theme.chord : Theme.text
                                     font.family: Theme.fontFamily
                                     font.pixelSize: (ev.active ? 19 : 16) * root.zoom

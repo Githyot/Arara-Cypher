@@ -4,12 +4,15 @@ import AraraCypher
 // Tab colorida de uma parte (StrumStrip) com a mão dos dedos ao lado e,
 // no modo de edição, o painel da nota escolhida: tocar numa casa muda o
 // número, o dedo (a cor) ou se a corda toca; tocar numa seta troca o golpe.
-// Mexe direto em song.voicings e strum.pattern e avisa com edited().
+// Mexe direto em song.voicings e, para os tempos de cada compasso, em
+// section.measures[i] (só aquele acorde muda; os outros seguem a batida).
+// Avisa com edited().
 Column {
     id: root
     property var song: null
     property var chords: []
     property var strum: null
+    property var section: null          // a parte de verdade (não a cópia do Repeater)
     property int semitones: 0
     property real zoom: 1
     property int rev: 0
@@ -21,14 +24,13 @@ Column {
     property int localRev: 0
     onEditingChanged: sel = null
     readonly property int allRev: rev + localRev
-    readonly property var strokeCodes: ["", "B", "D", "d", "U", "X"]
+    readonly property var strokeCodes: ["", "B", "D", "d", "U", "X", "XU"]
 
     function editShape(token) {
         if (!song.voicings) song.voicings = {}
         var v = song.voicings[token]
         if (!v) {
-            var sh = Examples.shape(Examples.chordName(token), 0, null)
-            if (!sh) return null
+            var sh = Examples.shape(Examples.chordName(token), 0, null) || Examples.blankShape()
             v = { frets: sh.frets.slice(), fingers: sh.fingers.slice() }
             song.voicings[token] = v
         }
@@ -46,20 +48,42 @@ Column {
         v.fingers[sel.string] = finger
         changed()
     }
-    function cycleStroke(step) {
-        if (!strum) return
-        var code = strum.pattern[step]
+    // Tempos de um compasso: os próprios dele, se já foi mexido, ou os da batida.
+    function patternOf(index) {
+        var base = strum ? strum.pattern : ["D"]
+        var own = section && section.measures ? section.measures[index] : null
+        return own && own.length === base.length ? own : base
+    }
+    function patterns() {
+        var out = []
+        for (var i = 0; i < chords.length; ++i) out.push(patternOf(i).slice())
+        return out
+    }
+    // Para mudar só este compasso: cria a cópia dele na parte.
+    function ownPattern(index) {
+        if (!section) return strum ? strum.pattern : null
+        if (!section.measures) section.measures = []
+        while (section.measures.length < chords.length) section.measures.push(null)
+        var own = section.measures[index]
+        if (!own || !strum || own.length !== strum.pattern.length)
+            section.measures[index] = own = (strum ? strum.pattern : ["D"]).slice()
+        return own
+    }
+    function cycleStroke(index, step) {
+        var pat = ownPattern(index)
+        if (!pat) return
+        var code = pat[step]
         if (Examples.isPick(code)) {
             // Dedilhado: a seta só vira (para baixo / para cima).
-            strum.pattern[step] = Examples.pickCode(Examples.pickStrings(code), !Examples.strokeUp(code))
+            pat[step] = Examples.pickCode(Examples.pickStrings(code), !Examples.strokeUp(code))
         } else {
             var i = strokeCodes.indexOf(code)
-            strum.pattern[step] = strokeCodes[(i + 1) % strokeCodes.length]
+            pat[step] = strokeCodes[(i + 1) % strokeCodes.length]
         }
         changed()
     }
     function baseShape(token) {
-        return Examples.shape(Examples.chordName(token), 0, Examples.voicing(song, token))
+        return Examples.shape(Examples.chordName(token), 0, Examples.voicing(song, token)) || Examples.blankShape()
     }
     // Tocar numa casa da tab: se tem número, escolhe; se está vazia, põe a
     // corda naquele tempo (vira dedilhado: só as cordas escolhidas tocam).
@@ -80,8 +104,8 @@ Column {
         setFret(n)
     }
     function move(dString, dStep) {
-        if (!sel || !strum) return
-        var n = strum.pattern.length
+        if (!sel) return
+        var n = patternOf(sel.index).length
         var index = sel.index, step = sel.step + dStep
         if (step >= n && index < chords.length - 1) { index++; step = 0 }
         else if (step < 0 && index > 0) { index--; step = n - 1 }
@@ -108,29 +132,69 @@ Column {
     function tapCell(index, token, string, step) {
         forceActiveFocus()
         sel = { index: index, token: token, string: string, step: step }
-        if (!strum) return
         var sh = baseShape(token)
-        var code = strum.pattern[step]
+        var code = patternOf(index)[step]
         var strings = Examples.strokeStrings(sh, code)
         if (strings.indexOf(string) >= 0) return
-        if (sh && sh.frets[string] < 0) {
+        var pat = ownPattern(index)
+        if (!pat) return
+        if (sh.frets[string] < 0) {
+            // A corda não fazia parte do acorde: os outros tempos deste compasso
+            // ficam como estão (viram dedilhado com as cordas que já tocavam),
+            // para a nota nova aparecer só onde foi tocada.
+            for (var j = 0; j < pat.length; ++j) {
+                if (j === step || pat[j] === "" || Examples.isMute(pat[j]) || Examples.isPick(pat[j])) continue
+                var keep = Examples.strokeStrings(sh, pat[j])
+                pat[j] = keep.length ? Examples.pickCode(keep, Examples.strokeUp(pat[j])) : (Examples.strokeUp(pat[j]) ? "PU" : "P")
+            }
             var v = editShape(token)
             if (v) { v.frets[string] = 0; v.fingers[string] = 0 }
         }
         strings.push(string)
-        strum.pattern[step] = Examples.pickCode(strings, Examples.strokeUp(code))
+        pat[step] = Examples.pickCode(strings, Examples.strokeUp(code))
         changed()
     }
     function removeFromStep() {
-        if (!strum || !sel) return
+        if (!sel) return
+        var pat = ownPattern(sel.index)
+        if (!pat) return
         var sh = baseShape(sel.token)
-        var code = strum.pattern[sel.step]
+        var code = pat[sel.step]
         var strings = Examples.strokeStrings(sh, code).filter(function (s) { return s !== sel.string })
-        strum.pattern[sel.step] = Examples.pickCode(strings, Examples.strokeUp(code))
+        pat[sel.step] = Examples.pickCode(strings, Examples.strokeUp(code))
         changed()
     }
 
     spacing: 8
+
+    Item {
+        width: parent.width
+        height: Math.max(strip.implicitHeight, hand.implicitHeight)
+        HandLegend {
+            id: hand
+            anchors.right: parent.right
+            zoom: Math.min(root.zoom, 1.2)
+        }
+        StrumStrip {
+            id: strip
+            width: parent.width - hand.width - 12
+            chords: root.chords
+            song: root.song
+            // Na edição a tab fica no tom original (as casas salvas são as de verdade).
+            semitones: root.editing ? 0 : root.semitones
+            pattern: root.allRev, root.strum ? root.strum.pattern.slice() : ["D"]
+            patterns: root.allRev, root.patterns()
+            counts: root.strum ? root.strum.counts : []
+            zoom: root.zoom
+            rev: root.allRev
+            editing: root.editing
+            selIndex: root.sel ? root.sel.index : -1
+            selString: root.sel ? root.sel.string : -1
+            selStep: root.sel ? root.sel.step : -1
+            onNoteClicked: (i, token, string, step) => root.tapCell(i, token, string, step)
+            onStepClicked: (i, step) => root.cycleStroke(i, step)
+        }
+    }
 
     Column {
         id: notePanel
@@ -138,7 +202,7 @@ Column {
         width: parent.width
         spacing: 8
         readonly property bool on: !!root.sel
-        readonly property var v: root.allRev, on ? Examples.shape(Examples.chordName(root.sel.token), 0, Examples.voicing(root.song, root.sel.token)) : null
+        readonly property var v: root.allRev, on ? root.baseShape(root.sel.token) : null
         readonly property int fret: v ? v.frets[root.sel.string] : -1
         readonly property int finger: v ? (v.fingers[root.sel.string] || 0) : 0
         Text {
@@ -229,34 +293,6 @@ Column {
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontSize - 2
             }
-        }
-    }
-
-    Item {
-        width: parent.width
-        height: Math.max(strip.implicitHeight, hand.implicitHeight)
-        HandLegend {
-            id: hand
-            anchors.right: parent.right
-            zoom: Math.min(root.zoom, 1.2)
-        }
-        StrumStrip {
-            id: strip
-            width: parent.width - hand.width - 12
-            chords: root.chords
-            song: root.song
-            // Na edição a tab fica no tom original (as casas salvas são as de verdade).
-            semitones: root.editing ? 0 : root.semitones
-            pattern: root.allRev, root.strum ? root.strum.pattern.slice() : ["D"]
-            counts: root.strum ? root.strum.counts : []
-            zoom: root.zoom
-            rev: root.allRev
-            editing: root.editing
-            selIndex: root.sel ? root.sel.index : -1
-            selString: root.sel ? root.sel.string : -1
-            selStep: root.sel ? root.sel.step : -1
-            onNoteClicked: (i, token, string, step) => root.tapCell(i, token, string, step)
-            onStepClicked: (step) => root.cycleStroke(step)
         }
     }
 }

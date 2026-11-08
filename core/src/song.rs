@@ -333,9 +333,12 @@ fn strum_from(block: &[&str]) -> Strum {
         near(&mute, col) || (col > 0 && near(&mute, col - 1)) || near(&mute, col + 1)
     };
     let code = |c: char, col: usize| -> String {
-        if "xX✕×".contains(c) || muted_at(col) {
+        let up = c == '↑' || c == '⇡' || c == '🡑';
+        if "xX✕×".contains(c) || (muted_at(col) && !up) {
             "X".into()
-        } else if c == '↑' || c == '⇡' || c == '🡑' {
+        } else if muted_at(col) {
+            "XU".into()
+        } else if up {
             "U".into()
         } else {
             "D".into()

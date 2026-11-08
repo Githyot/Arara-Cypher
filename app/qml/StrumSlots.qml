@@ -11,8 +11,8 @@ Column {
     property int rev: 0               // muda a cada edição (o padrão é mexido no lugar)
     signal changed()
 
-    readonly property var codes: ["", "B", "D", "d", "U", "X"]
-    readonly property var codeLabel: ({ "": "·", "B": "baixo", "D": "tudo", "d": "acorde", "U": "agudas", "X": "abafa" })
+    readonly property var codes: ["", "B", "D", "d", "U", "X", "XU"]
+    readonly property var codeLabel: ({ "": "·", "B": "baixo", "D": "tudo", "d": "acorde", "U": "agudas", "X": "abafa ↓", "XU": "abafa ↑" })
 
     spacing: 6
     readonly property int per: rev, !strum ? 2 : strum.per ? strum.per
@@ -72,7 +72,7 @@ Column {
                 Text {
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: Examples.strokeArrow(slot.modelData)
-                    color: slot.modelData === "" || slot.modelData === "X" ? Theme.textDim : Theme.accent
+                    color: slot.modelData === "" || Examples.isMute(slot.modelData) ? Theme.textDim : Theme.accent
                     font.pixelSize: 22
                     font.weight: Font.Bold
                 }

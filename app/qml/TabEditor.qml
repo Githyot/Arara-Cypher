@@ -144,7 +144,8 @@ Column {
             typed = typedTimer.running && typed.length === 1 && parseInt(typed + d) <= 24 ? typed + d : d
             typedTimer.restart()
             setNote(curString, Math.min(24, parseInt(typed)))
-        } else if (e.key === Qt.Key_Backspace || e.key === Qt.Key_Delete) setNote(curString, -1)
+        } else if (e.key === Qt.Key_X) { typed = ""; setNote(curString, root.muted) }
+        else if (e.key === Qt.Key_Backspace || e.key === Qt.Key_Delete) setNote(curString, -1)
         else if (e.key === Qt.Key_Left) step(-1)
         else if (e.key === Qt.Key_Right) step(1)
         else if (e.key === Qt.Key_Up) { curString = Math.min(5, curString + 1); typed = ""; rev++ }
@@ -155,6 +156,7 @@ Column {
         e.accepted = true
     }
 
+    readonly property int muted: 255     // "x": corda abafada (tab::MUTED)
     function pick(string, fret) {
         ensure()
         var e = model[curS].events[curE]
@@ -255,7 +257,7 @@ Column {
     Text {
         width: parent.width
         wrapMode: Text.WordWrap
-        text: "Toque numa corda de um toque e digite a casa (dois números seguidos = 10, 11...). Delete tira, setas ←→ andam nos toques e ↑↓ nas cordas, + põe um toque depois, − exclui. Arraste uma nota para outra corda ou toque; arraste o topo da coluna para mudar o toque de lugar. Toque embaixo para pôr a seta.\nCopiar e colar: Shift+clique (ou Shift+setas) escolhe vários toques; Ctrl+C copia, Ctrl+X recorta, Ctrl+V cola depois do toque escolhido (vale de uma parte para outra)."
+        text: "Toque numa corda de um toque e digite a casa (dois números seguidos = 10, 11...). X = corda abafada (não tocar), Delete tira, setas ←→ andam nos toques e ↑↓ nas cordas, + põe um toque depois, − exclui. Arraste uma nota para outra corda ou toque; arraste o topo da coluna para mudar o toque de lugar. Toque embaixo para pôr a seta.\nCopiar e colar: Shift+clique (ou Shift+setas) escolhe vários toques; Ctrl+C copia, Ctrl+X recorta, Ctrl+V cola depois do toque escolhido (vale de uma parte para outra)."
         color: Theme.textDim
         font.family: Theme.fontFamily
         font.pixelSize: Theme.fontSize - 2
@@ -314,10 +316,12 @@ Column {
                             Rectangle {
                                 x: root.labelW
                                 width: root.colX(sysItem.index, sysItem.modelData.events.length) - x + 4
-                                height: 1
-                                anchors.verticalCenter: parent.verticalCenter
+                                // Posição inteira e 2 px: com escala de tela fracionária uma
+                                // linha de 1 px no meio de um pixel sumia (faltava a corda Lá).
+                                y: Math.round(parent.height / 2) - 1
+                                height: 2
                                 color: Theme.textDim
-                                opacity: 0.5
+                                opacity: 0.45
                             }
                         }
                     }
@@ -385,7 +389,7 @@ Column {
                                     Text {
                                         id: t
                                         anchors.centerIn: parent
-                                        text: (parent.modelData.tech || "") + parent.modelData.fret
+                                        text: (parent.modelData.tech || "") + (parent.modelData.fret === root.muted ? "x" : parent.modelData.fret)
                                         color: Theme.text
                                         font.family: Theme.fontFamily
                                         font.pixelSize: 12
@@ -486,6 +490,7 @@ Column {
         AppButton { text: "▶"; onClicked: { var s = root.sys(); if (s && root.curE < s.events.length - 1) root.curE++; else if (root.curS < root.model.length - 1) { root.curS++; root.curE = 0 } root.rev++ } }
         AppButton { text: "Toque antes"; iconName: "add"; onClicked: root.insert(false) }
         AppButton { text: "Toque depois"; iconName: "add"; onClicked: root.insert(true) }
+        AppButton { text: "x (não tocar)"; enabled: !!root.current; onClicked: { root.forceActiveFocus(); root.setNote(root.curString, root.muted) } }
         AppButton { text: "Duplicar"; enabled: !!root.current; onClicked: root.duplicate() }
         AppButton { text: "Excluir toque"; enabled: !!root.current; onClicked: root.remove() }
         AppButton {

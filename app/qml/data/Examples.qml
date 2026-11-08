@@ -20,18 +20,19 @@ QtObject {
 
     // ---- Golpes da batida ----
     // "B" baixo, "D" tudo, "d" acorde sem o baixo, "U" agudas para cima,
-    // "X" abafado, "" pausa e, para dedilhado, "P" + cordas ("P03" = cordas 0
+    // "X" abafado para baixo, "XU" abafado para cima, "" pausa e, para dedilhado, "P" + cordas ("P03" = cordas 0
     // e 3 para baixo, "P5U" = corda 5 para cima). Corda 0 = Mi grave.
     function isPick(code) { return code && code.charAt(0) === "P" }
+    function isMute(code) { return code === "X" || code === "XU" }
     function strokeUp(code) {
-        return code === "U" || (isPick(code) && code.charAt(code.length - 1) === "U")
+        return code === "U" || code === "XU" || (isPick(code) && code.charAt(code.length - 1) === "U")
     }
     function strokeArrow(code) {
-        return code === "" ? "·" : code === "X" ? "×" : strokeUp(code) ? "↑" : "↓"
+        return code === "" ? "·" : isMute(code) ? (code === "XU" ? "↑×" : "↓×") : strokeUp(code) ? "↑" : "↓"
     }
     function strokeLabel(code) {
         if (isPick(code)) return "corda " + pickStrings(code).map(function (s) { return ["E", "A", "D", "G", "B", "e"][s] }).join("+")
-        return ({ "": "·", "B": "baixo", "D": "tudo", "d": "acorde", "U": "agudas", "X": "abafa" })[code] || code
+        return ({ "": "·", "B": "baixo", "D": "tudo", "d": "acorde", "U": "agudas", "X": "abafa ↓", "XU": "abafa ↑" })[code] || code
     }
     function pickStrings(code) {
         var out = []
@@ -52,10 +53,10 @@ QtObject {
         var played = []
         for (var s = 0; s < 6; ++s) if (shape.frets[s] >= 0) played.push(s)
         var upper = played.filter(function (s) { return s > shape.root })
-        return code === "B" ? [shape.root]
+        return code === "B" ? (shape.frets[shape.root] >= 0 ? [shape.root] : [])
              : code === "D" ? played
              : code === "d" || code === "X" ? upper
-             : code === "U" ? played.slice(-3) : []
+             : code === "U" || code === "XU" ? played.slice(-3) : []
     }
     // Contagem de uma batida com n tempos e "per" tempos por batida do compasso.
     function countsFor(n, per) {
@@ -87,6 +88,9 @@ QtObject {
     // Forma para desenhar: { frets, fingers, base, root }.
     // Com forma da aula e sem transposição, usa a da aula. Transpondo, a forma
     // da aula só anda pelo braço se não tiver corda solta; senão o app calcula.
+    function blankShape() {
+        return { frets: [-1, -1, -1, -1, -1, -1], fingers: [0, 0, 0, 0, 0, 0], base: 1, root: 0 }
+    }
     function shape(chord, semitones, v) {
         if (v) {
             var shift = ((semitones % 12) + 12) % 12

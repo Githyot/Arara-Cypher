@@ -52,7 +52,7 @@ Canvas {
         for (var i = 0; i < events.length; ++i) {
             var ns = events[i].notes || []
             for (var k = 0; k < ns.length; ++k)
-                top = Math.max(top, Examples.spell(open[ns[k].string] + ns[k].fret, keyName).step)
+                if (ns[k].fret !== 255) top = Math.max(top, Examples.spell(open[ns[k].string] + ns[k].fret, keyName).step)
         }
         return top
     }
@@ -199,7 +199,7 @@ Canvas {
                 ctx.font = "bold 11px sans-serif"
                 for (var k = 0; k < ev.notes.length; ++k) {
                     var n = ev.notes[k]
-                    var label2 = String(n.fret)
+                    var label2 = n.fret === 255 ? "x" : String(n.fret)
                     var tyy = tabTop + (5 - n.string) * tabGap
                     var tw = ctx.measureText(label2).width
                     ctx.fillStyle = Theme.card
@@ -236,6 +236,7 @@ Canvas {
                 var minY = 1e9, maxY = -1e9, prevStep = -100
                 for (var m = 0; m < ev.notes.length; ++m) {
                     var note = ev.notes[m]
+                    if (note.fret === 255) continue   // abafada: só na tab
                     var sp = Examples.spell(open[note.string] + note.fret, keyName)
                     var y = yOf(sp.step)
                     minY = Math.min(minY, y); maxY = Math.max(maxY, y)
@@ -262,6 +263,7 @@ Canvas {
                         ctx.fillText(sp.acc > 0 ? "♯" : "♭", cx - 15, y + 5)
                     }
                 }
+                if (minY > maxY) { stems.push(null); x += slotW; continue }   // só cordas abafadas: nada na pauta
                 var stTop = minY - gap * 3.5
                 ctx.strokeStyle = ink
                 ctx.lineWidth = 1.2

@@ -21,8 +21,8 @@ Rectangle {
     signal saved(var song)
     signal closed()
 
-    readonly property var codes: ["", "B", "D", "d", "U", "X"]
-    readonly property var codeLabel: ({ "": "·", "B": "baixo", "D": "tudo", "d": "acorde", "U": "agudas", "X": "abafa" })
+    readonly property var codes: ["", "B", "D", "d", "U", "X", "XU"]
+    readonly property var codeLabel: ({ "": "·", "B": "baixo", "D": "tudo", "d": "acorde", "U": "agudas", "X": "abafa ↓", "XU": "abafa ↑" })
 
     function defaultStrum() {
         return { name: "Batida", pattern: ["B", "", "d", "U", "", "U", "d", "U"],
@@ -494,8 +494,8 @@ Rectangle {
                                     onTextEdited: strumCard.st.name = text
                                 }
                                 AppButton {
-                                    visible: page.draft.strums.length > 1
-                                    iconName: "remove"
+                                    text: "Apagar batida"
+                                    flat: true
                                     onClicked: {
                                         page.draft.strums.splice(strumCard.index, 1)
                                         for (var i = 0; i < page.draft.sections.length; ++i) {
@@ -509,7 +509,7 @@ Rectangle {
                             }
                             Text {
                                 width: parent.width
-                                text: "Toque em cada tempo para trocar: · pausa, baixo, tudo, acorde (sem o baixo), agudas (para cima), abafa."
+                                text: "Toque em cada tempo para trocar: · pausa, baixo, tudo, acorde (sem o baixo), agudas (para cima), abafado para baixo (↓×) e para cima (↑×)."
                                 wrapMode: Text.WordWrap
                                 color: Theme.textDim
                                 font.family: Theme.fontFamily
@@ -618,8 +618,6 @@ Rectangle {
                                 readonly property var modelData: page.rev, page.draft.sections[partRow.index] || partRow.modelData
                                 readonly property int index: partRow.index
                                 property bool showTab: !!modelData.tab
-                                property bool showBoard: true
-                                property bool showColor: false
                                 x: handle.width + 6
                             width: parent.width - x
                                 padding: partFold.expanded ? 14 : 4
@@ -629,7 +627,7 @@ Rectangle {
                                     title: secCard.modelData.name || "Parte sem nome"
                                     badge: page.rev, (secCard.modelData.repeat || 1) > 1 ? secCard.modelData.repeat + "×" : ""
                                     summary: page.rev, secCard.modelData.chords.join("  ")
-                                             + (page.draft.strums.length > 1 && secCard.modelData.chords.length
+                                             + (page.draft.strums.length > 1 && secCard.modelData.chords.length && page.draft.strums[Math.min(secCard.modelData.strum || 0, page.draft.strums.length - 1)]
                                                 ? "  · " + (page.draft.strums[Math.min(secCard.modelData.strum || 0, page.draft.strums.length - 1)].name || "batida") : "")
                                              + (secCard.modelData.tab ? (secCard.modelData.chords.length ? "  · " : "") + "tab" : "")
                                     expanded: !!secCard.modelData._open
@@ -727,7 +725,15 @@ Rectangle {
                                                 }
                                             }
                                         }
+                                        Text {
+                                            visible: !partStrum.strum
+                                            text: "Sem batida: cada acorde aparece com um toque só. Escolha ou crie uma batida acima."
+                                            color: Theme.textDim
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: Theme.fontSize - 1
+                                        }
                                         StrumSlots {
+                                            visible: !!partStrum.strum
                                             width: parent.width
                                             slotW: 44
                                             strum: partStrum.strum
@@ -745,21 +751,17 @@ Rectangle {
                                         }
                                     }
 
-                                    AppButton {
-                                        visible: secCard.modelData.chords.length > 0
-                                        text: secCard.showColor ? "Esconder a tab colorida" : "Editar a tab colorida (casa, dedo, setas)"
-                                        onClicked: secCard.showColor = !secCard.showColor
-                                    }
                                     ChordTab {
-                                        visible: secCard.showColor && secCard.modelData.chords.length > 0
+                                        visible: secCard.modelData.chords.length > 0
                                         width: parent.width
                                         chords: visible ? secCard.modelData.chords : []
                                         song: page.draft
                                         strum: partStrum.strum
+                                        section: secCard.modelData
                                         zoom: 0.9
                                         rev: page.rev
                                         editing: true
-                                        onEdited: page.bump()
+                                        onEdited: {}  // sem bump: refazer as partes perderia a nota escolhida
                                     }
 
                                     AppTextArea {
@@ -790,13 +792,8 @@ Rectangle {
                                         font.family: Theme.fontFamily
                                         font.pixelSize: Theme.fontSize - 1
                                     }
-                                    AppButton {
-                                        visible: secCard.showTab
-                                        text: secCard.showBoard ? "Esconder o editor visual" : "Editor visual (braço e toques)"
-                                        onClicked: secCard.showBoard = !secCard.showBoard
-                                    }
                                     TabEditor {
-                                        visible: secCard.showTab && secCard.showBoard
+                                        visible: secCard.showTab
                                         width: parent.width
                                         text: visible ? tabArea.text : ""
                                         onEdited: (t) => { tabArea.text = t }

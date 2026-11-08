@@ -12,7 +12,7 @@ import AraraCypher
 //   "D"  todas as cordas do acorde, para baixo
 //   "d"  cordas do acorde sem o baixo, para baixo
 //   "U"  as três cordas mais agudas do acorde, para cima
-//   "X"  abafado: palheta para baixo com a mão abafando as cordas
+//   "X"  abafado: palheta para baixo com a mão abafando as cordas ("XU" para cima)
 //   ""   pausa
 Item {
     id: root
@@ -35,7 +35,9 @@ Item {
 
     property var voicing: null        // forma tirada da aula (opcional)
     property int rev: 0               // muda quando a forma é editada no lugar
-    readonly property var shape: rev, Examples.shape(chord, semitones, voicing)
+    // Acorde que o app não conhece (ex.: Em7(9)) e sem forma salva: tab vazia,
+    // para dar para pôr as notas uma a uma.
+    readonly property var shape: rev, Examples.shape(chord, semitones, voicing) || Examples.blankShape()
 
     // Para cada tempo: lista de 6 valores (corda 0 = Mi grave) com a casa,
     // "x" para abafada ou null se a corda não soa.
@@ -47,7 +49,7 @@ Item {
             var code = pattern[i]
             var strings = Examples.strokeStrings(shape, code)
             for (var k = 0; k < strings.length; ++k)
-                c[strings[k]] = code === "X" ? "x" : shape.frets[strings[k]]
+                c[strings[k]] = Examples.isMute(code) ? "x" : shape.frets[strings[k]]
             cols.push(c)
         }
         return cols
@@ -69,9 +71,9 @@ Item {
             height: root.rowH
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
-            text: code === "" ? (root.editing ? "·" : "") : code === "X" && !root.editing ? "↓" : Examples.strokeArrow(code)
-            color: code === "X" || code === "" ? Theme.textDim : Theme.chord
-            font.pixelSize: 17
+            text: code === "" ? (root.editing ? "·" : "") : Examples.strokeArrow(code)
+            color: Examples.isMute(code) || code === "" ? Theme.textDim : Theme.chord
+            font.pixelSize: Examples.isMute(code) ? 12 : 17
             font.bold: true
             Rectangle {
                 visible: root.editing

@@ -533,14 +533,14 @@ Rectangle {
                                                 horizontalAlignment: Text.AlignHCenter
                                                 text: Examples.strokeArrow(beat.modelData)
                                                 color: beat.modelData === "" ? Theme.textDim
-                                                     : beat.modelData === "X" ? Theme.textDim : Theme.accent
+                                                     : Examples.isMute(beat.modelData) ? Theme.textDim : Theme.accent
                                                 font.pixelSize: 26
                                                 font.weight: Font.Bold
                                             }
                                             Text {
                                                 width: parent.width
                                                 horizontalAlignment: Text.AlignHCenter
-                                                text: ({ "B": "baixo", "D": "tudo", "d": "acorde", "U": "agudas", "X": "abafa" })[beat.modelData] || " "
+                                                text: ({ "B": "baixo", "D": "tudo", "d": "acorde", "U": "agudas", "X": "abafa ↓", "XU": "abafa ↑" })[beat.modelData] || " "
                                                 color: Theme.text
                                                 font.family: Theme.fontFamily
                                                 font.pixelSize: 10
@@ -685,6 +685,7 @@ Rectangle {
                                     chords: visible ? section.modelData.chords : []
                                     song: page.song
                                     strum: section.strum
+                                    section: page.song.sections[section.index]
                                     semitones: page.shift
                                     zoom: page.zoom
                                     rev: page.rev

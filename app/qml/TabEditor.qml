@@ -17,6 +17,7 @@ Column {
     property string lastText: "\u0000"
     property int curS: 0
     property int curE: 0
+    property int curString: 5          // corda escolhida para o teclado
     property int rev: 0
 
     function reload() {
@@ -44,6 +45,9 @@ Column {
     function sys() { return model.length ? model[curS] : null }
     function ev() { var s = sys(); return s && s.events.length ? s.events[curE] : null }
     readonly property var current: rev, ev()
+    // Cópia para a tela: o modelo é mexido no lugar e a Repeater só redesenha
+    // quando recebe uma lista nova.
+    readonly property var view: rev, JSON.parse(JSON.stringify(model))
 
     // Ajusta índices de acordes e barras quando um toque entra ou sai.
     function shift(s, from, d) {
@@ -56,6 +60,51 @@ Column {
         if (model.length === 0) model.push({ chords: [], events: [{ notes: [], arrow: "" }], bars: [] })
         if (model[curS].events.length === 0) model[curS].events.push({ notes: [], arrow: "" })
     }
+    // ---- Teclado ----
+    // Números digitam a casa na corda escolhida (dois seguidos = 10, 11...),
+    // Delete/Backspace tira a nota, setas ←/→ andam nos toques e ↑/↓ nas
+    // cordas, Insert ou "+" põe um toque depois, "-" exclui o toque.
+    property string typed: ""
+    Timer { id: typedTimer; interval: 900; onTriggered: root.typed = "" }
+    function setNote(string, fret) {
+        ensure()
+        var e = model[curS].events[curE]
+        e.notes = e.notes.filter(function (n) { return n.string !== string })
+        if (fret >= 0) e.notes.push({ string: string, fret: fret })
+        e.notes.sort(function (a, b) { return a.string - b.string })
+        commit()
+    }
+    function step(d) {
+        var s = sys()
+        if (!s) return
+        if (d > 0) {
+            if (curE < s.events.length - 1) curE++
+            else if (curS < model.length - 1) { curS++; curE = 0 }
+        } else {
+            if (curE > 0) curE--
+            else if (curS > 0) { curS--; curE = model[curS].events.length - 1 }
+        }
+        typed = ""
+        rev++
+    }
+    focus: true
+    Keys.onPressed: (e) => {
+        if (e.key >= Qt.Key_0 && e.key <= Qt.Key_9) {
+            var d = String(e.key - Qt.Key_0)
+            typed = typedTimer.running && typed.length === 1 && parseInt(typed + d) <= 24 ? typed + d : d
+            typedTimer.restart()
+            setNote(curString, Math.min(24, parseInt(typed)))
+        } else if (e.key === Qt.Key_Backspace || e.key === Qt.Key_Delete) setNote(curString, -1)
+        else if (e.key === Qt.Key_Left) step(-1)
+        else if (e.key === Qt.Key_Right) step(1)
+        else if (e.key === Qt.Key_Up) { curString = Math.min(5, curString + 1); typed = ""; rev++ }
+        else if (e.key === Qt.Key_Down) { curString = Math.max(0, curString - 1); typed = ""; rev++ }
+        else if (e.key === Qt.Key_Insert || e.key === Qt.Key_Plus) insert(true)
+        else if (e.key === Qt.Key_Minus) remove()
+        else return
+        e.accepted = true
+    }
+
     function pick(string, fret) {
         ensure()
         var e = model[curS].events[curE]
@@ -156,7 +205,7 @@ Column {
     Text {
         width: parent.width
         wrapMode: Text.WordWrap
-        text: "Toque numa coluna para escolher o toque; no braço, toque na casa para pôr, trocar ou tirar a nota. Arraste uma nota para outra corda ou outro toque; arraste o nome do acorde (ou o topo da coluna) para mudar o toque de lugar. Toque embaixo para pôr a seta."
+        text: "Toque numa coluna para escolher o toque; no braço, toque na casa para pôr, trocar ou tirar a nota. Arraste uma nota para outra corda ou outro toque; arraste o topo da coluna para mudar o toque de lugar. Toque embaixo para pôr a seta.\nTeclado: digite a casa na corda marcada, Delete tira, setas ←→ andam nos toques e ↑↓ nas cordas, + põe um toque depois, − exclui."
         color: Theme.textDim
         font.family: Theme.fontFamily
         font.pixelSize: Theme.fontSize - 2
@@ -180,7 +229,7 @@ Column {
             height: Math.max(1, root.model.length) * (root.sysH + 10)
 
             Repeater {
-                model: root.rev, root.model
+                model: root.view
                 Item {
                     id: sysItem
                     required property var modelData
@@ -248,6 +297,18 @@ Column {
                                 color: col.selected ? Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.22) : "transparent"
                                 border.width: col.selected ? 1.5 : 0
                                 border.color: Theme.accent
+                            }
+                            // Casa onde o teclado escreve.
+                            Rectangle {
+                                visible: col.selected
+                                x: 2
+                                y: root.rowH * (6 - root.curString) + 1
+                                width: parent.width - 4
+                                height: root.rowH - 2
+                                radius: 4
+                                color: "transparent"
+                                border.width: 2
+                                border.color: Theme.chord
                             }
                             Text {
                                 x: 2
@@ -346,7 +407,11 @@ Column {
                     active = false; from = null
                     if (!f) return
                     if (!wasDrag) {
-                        root.curS = f.s; root.curE = f.e; root.rev++
+                        root.forceActiveFocus()
+                        root.curS = f.s; root.curE = f.e
+                        if (f.string >= 0) root.curString = f.string
+                        root.typed = ""
+                        root.rev++
                         if (f.row >= 7) root.cycleArrow(f.s, f.e)
                         return
                     }
@@ -404,7 +469,7 @@ Column {
     // ---- Braço com as notas do toque escolhido ----
     FretInput {
         width: parent.width
-        marks: root.current ? root.current.notes : []
+        marks: root.rev, root.current ? root.current.notes.slice() : []
         onPicked: (string, fret) => root.pick(string, fret)
     }
 }

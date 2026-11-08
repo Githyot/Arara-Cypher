@@ -34,7 +34,8 @@ Item {
     readonly property var stringNames: ["E", "A", "D", "G", "B", "e"]
 
     property var voicing: null        // forma tirada da aula (opcional)
-    readonly property var shape: Examples.shape(chord, semitones, voicing)
+    property int rev: 0               // muda quando a forma é editada no lugar
+    readonly property var shape: rev, Examples.shape(chord, semitones, voicing)
 
     // Para cada tempo: lista de 6 valores (corda 0 = Mi grave) com a casa,
     // "x" para abafada ou null se a corda não soa.

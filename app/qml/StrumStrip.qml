@@ -117,6 +117,7 @@ Column {
                         editing: root.editing
                         selString: root.selIndex === measure.chordIndex ? root.selString : -1
                         selStep: root.selStep
+                        rev: root.rev
                         onNoteClicked: (string, step) => root.noteClicked(measure.chordIndex, measure.modelData, string, step)
                         onStepClicked: (step) => root.stepClicked(step)
                     }

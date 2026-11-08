@@ -63,7 +63,50 @@ Column {
     }
     // Tocar numa casa da tab: se tem número, escolhe; se está vazia, põe a
     // corda naquele tempo (vira dedilhado: só as cordas escolhidas tocam).
+    // ---- Teclado ----
+    // Com uma casa escolhida: números digitam a casa (dois dígitos seguidos
+    // viram 10, 11...), Delete/Backspace tira do tempo, X = não tocar,
+    // setas andam entre cordas e tempos, Enter/Esc fecham.
+    property string typed: ""
+    Timer { id: typedTimer; interval: 900; onTriggered: root.typed = "" }
+    function typeDigit(d) {
+        if (!sel) return
+        // Garante que a nota está no tempo antes de mudar a casa.
+        tapCell(sel.index, sel.token, sel.string, sel.step)
+        // Dois dígitos seguidos viram um número só se der uma casa (até 20).
+        typed = typedTimer.running && typed.length === 1 && parseInt(typed + d) <= 20 ? typed + d : d
+        typedTimer.restart()
+        var n = Math.min(20, parseInt(typed))
+        setFret(n)
+    }
+    function move(dString, dStep) {
+        if (!sel || !strum) return
+        var n = strum.pattern.length
+        var index = sel.index, step = sel.step + dStep
+        if (step >= n && index < chords.length - 1) { index++; step = 0 }
+        else if (step < 0 && index > 0) { index--; step = n - 1 }
+        step = Math.max(0, Math.min(n - 1, step))
+        var string = Math.max(0, Math.min(5, sel.string + dString))
+        sel = { index: index, token: chords[index], string: string, step: step }
+        typed = ""
+    }
+    focus: editing
+    Keys.onPressed: (e) => {
+        if (!editing || !sel) return
+        if (e.key >= Qt.Key_0 && e.key <= Qt.Key_9) typeDigit(String(e.key - Qt.Key_0))
+        else if (e.key === Qt.Key_Backspace || e.key === Qt.Key_Delete) removeFromStep()
+        else if (e.key === Qt.Key_X) setFret(-1)
+        else if (e.key === Qt.Key_Left) move(0, -1)
+        else if (e.key === Qt.Key_Right) move(0, 1)
+        else if (e.key === Qt.Key_Up) move(1, 0)
+        else if (e.key === Qt.Key_Down) move(-1, 0)
+        else if (e.key === Qt.Key_Escape || e.key === Qt.Key_Return || e.key === Qt.Key_Enter) sel = null
+        else return
+        e.accepted = true
+    }
+
     function tapCell(index, token, string, step) {
+        forceActiveFocus()
         sel = { index: index, token: token, string: string, step: step }
         if (!strum) return
         var sh = baseShape(token)
@@ -84,7 +127,6 @@ Column {
         var code = strum.pattern[sel.step]
         var strings = Examples.strokeStrings(sh, code).filter(function (s) { return s !== sel.string })
         strum.pattern[sel.step] = Examples.pickCode(strings, Examples.strokeUp(code))
-        sel = null
         changed()
     }
 
@@ -103,7 +145,7 @@ Column {
             visible: !notePanel.on
             width: parent.width
             wrapMode: Text.WordWrap
-            text: "Toque num lugar vazio (+) para pôr um número naquele tempo: assim se monta o dedilhado. Toque num número para mudar a casa, o dedo ou tirar. Toque numa seta para trocar o golpe."
+            text: "Toque num lugar vazio (+) para pôr um número naquele tempo: assim se monta o dedilhado. Toque num número para mudar a casa, o dedo ou tirar. Toque numa seta para trocar o golpe. Teclado: digite a casa, Delete tira, setas andam."
                   + (root.status ? " " + root.status : "")
             color: Theme.textDim
             font.family: Theme.fontFamily
